@@ -3,14 +3,17 @@ from __future__ import annotations
 
 import os
 
-import anthropic
+from google import genai
+from google.genai import errors, types
 
 from .models import MatchResult
 from .prompts import SYSTEM_PROMPT
 
-DEFAULT_MODEL = os.environ.get("ATS_AGENT_MODEL", "claude-opus-5")
+# gemini-2.5-flash is available on Google AI Studio's free tier.
+DEFAULT_MODEL = os.environ.get("ATS_AGENT_MODEL", "gemini-2.5-flash")
 
-# Rough character budget to stay well within context and keep costs predictable.
+# Rough character budget to stay well within context and keep the free tier's
+# per-request quota predictable.
 MAX_DOCUMENT_CHARS = 60_000
 
 
@@ -22,7 +25,7 @@ class ATSAgent:
     """Compares a candidate's CV against a job description and scores the match."""
 
     def __init__(self, api_key: str | None = None, model: str = DEFAULT_MODEL):
-        self.client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
+        self.client = genai.Client(api_key=api_key) if api_key else genai.Client()
         self.model = model
 
     def analyze(self, resume_text: str, job_description: str) -> MatchResult:
@@ -46,20 +49,29 @@ class ATSAgent:
         )
 
         try:
-            response = self.client.messages.parse(
+            response = self.client.models.generate_content(
                 model=self.model,
-                max_tokens=4096,
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_prompt}],
-                output_format=MatchResult,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    response_mime_type="application/json",
+                    response_schema=MatchResult,
+                ),
             )
-        except anthropic.AuthenticationError as e:
-            raise ATSAgentError("Invalid Anthropic API key.") from e
-        except anthropic.RateLimitError as e:
-            raise ATSAgentError("Rate limited by the Anthropic API. Please try again shortly.") from e
-        except anthropic.APIStatusError as e:
-            raise ATSAgentError(f"Anthropic API error: {e.message}") from e
-        except anthropic.APIConnectionError as e:
-            raise ATSAgentError("Could not reach the Anthropic API. Check your network connection.") from e
+        except errors.ClientError as e:
+            if e.code in (401, 403):
+                raise ATSAgentError("Invalid or unauthorized Gemini API key.") from e
+            if e.code == 429:
+                raise ATSAgentError(
+                    "Gemini free-tier rate limit reached. Please wait a bit and try again."
+                ) from e
+            raise ATSAgentError(f"Gemini API error: {e.message}") from e
+        except errors.ServerError as e:
+            raise ATSAgentError(f"Gemini server error, please retry: {e.message}") from e
+        except errors.APIError as e:
+            raise ATSAgentError(f"Gemini API error: {e.message}") from e
 
-        return response.parsed_output
+        if response.parsed is None:
+            raise ATSAgentError("The model did not return a valid structured response.")
+
+        return response.parsed

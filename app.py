@@ -13,7 +13,7 @@ st.set_page_config(page_title="ATS Match Agent", page_icon="🎯", layout="wide"
 
 
 def get_api_key() -> str | None:
-    env_key = os.environ.get("ANTHROPIC_API_KEY")
+    env_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if env_key:
         return env_key
     return st.session_state.get("api_key") or None
@@ -24,18 +24,21 @@ def render_sidebar() -> None:
         st.header("🎯 ATS Match Agent")
         st.caption("Upload a CV and a job description to get an AI-scored match.")
 
-        if not os.environ.get("ANTHROPIC_API_KEY"):
+        if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
             st.text_input(
-                "Anthropic API key",
+                "Gemini API key",
                 type="password",
                 key="api_key",
-                help="Not stored anywhere - only kept for this browser session.",
+                help=(
+                    "Free key from https://aistudio.google.com/apikey. "
+                    "Not stored anywhere - only kept for this browser session."
+                ),
             )
         else:
             st.success("API key loaded from environment.", icon="✅")
 
         st.divider()
-        st.caption(f"Model: `{os.environ.get('ATS_AGENT_MODEL', 'claude-opus-5')}`")
+        st.caption(f"Model: `{os.environ.get('ATS_AGENT_MODEL', 'gemini-2.5-flash')}`")
         st.caption("Supported files: PDF, DOCX, TXT")
 
 
@@ -131,7 +134,7 @@ def main() -> None:
     if analyze_clicked:
         api_key = get_api_key()
         if not api_key:
-            st.error("Please enter your Anthropic API key in the sidebar.")
+            st.error("Please enter your Gemini API key in the sidebar.")
             return
         if resume_file is None:
             st.error("Please upload a CV.")

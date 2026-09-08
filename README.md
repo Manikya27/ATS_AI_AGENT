@@ -15,7 +15,7 @@ skills, and suggests concrete CV improvements. Built as a Streamlit app on top o
   - matched vs. missing skills
   - strengths and gaps
   - actionable suggestions to improve the CV
-- Runs on Claude via the Anthropic API
+- Runs on **Google Gemini's free tier** (`gemini-2.5-flash` by default) - no paid API required
 
 ## Project structure
 
@@ -36,11 +36,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Set your Anthropic API key (or enter it in the app's sidebar at runtime):
+Get a **free** Gemini API key at https://aistudio.google.com/apikey, then set it (or enter it in
+the app's sidebar at runtime):
 
 ```bash
 cp .env.example .env   # then edit .env
-export ANTHROPIC_API_KEY=sk-ant-...
+export GEMINI_API_KEY=your-gemini-api-key
 ```
 
 ## Run
@@ -55,15 +56,15 @@ Then open the local URL Streamlit prints (usually http://localhost:8501).
 
 | Env var | Purpose | Default |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key | none - falls back to the sidebar input |
-| `ATS_AGENT_MODEL` | Claude model to use | `claude-opus-5` |
+| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Free Gemini API key from Google AI Studio | none - falls back to the sidebar input |
+| `ATS_AGENT_MODEL` | Gemini model to use | `gemini-2.5-flash` |
 
 ## Using the agent programmatically
 
 ```python
 from ats_agent import ATSAgent
 
-agent = ATSAgent()  # reads ANTHROPIC_API_KEY from the environment
+agent = ATSAgent()  # reads GEMINI_API_KEY from the environment
 result = agent.analyze(resume_text, job_description_text)
 
 print(result.match_percentage, result.verdict)
