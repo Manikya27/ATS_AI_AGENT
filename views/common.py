@@ -9,17 +9,18 @@ from ats_agent.models import ImprovementPlan, JobSuggestions, MatchResult
 
 
 def get_api_key() -> str | None:
-    env_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if env_key:
-        return env_key
-    return st.session_state.get("api_key") or None
+    """The API key is a server-side deployment secret - never collected from visitors."""
+    return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or None
 
 
 def require_api_key() -> str | None:
     """Return the configured API key, or show an error and return None."""
     api_key = get_api_key()
     if not api_key:
-        st.error("Please enter your Gemini API key in the sidebar to continue.")
+        st.error(
+            "This service isn't configured yet. An administrator needs to set the "
+            "GEMINI_API_KEY environment variable on the server."
+        )
     return api_key
 
 
