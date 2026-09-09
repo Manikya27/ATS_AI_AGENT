@@ -30,6 +30,20 @@ class MatchResult(BaseModel):
     summary: str = Field(..., description="2-4 sentence overall assessment")
 
 
+class CourseSuggestion(BaseModel):
+    """An upskilling suggestion aimed at closing one specific gap."""
+
+    skill_or_topic: str = Field(..., description="The gap this course/certification would close")
+    course_suggestion: str = Field(
+        ...,
+        description=(
+            "The type of course, certification, or learning path that would help - a "
+            "description of what to look for, not a specific real course/provider"
+        ),
+    )
+    why_it_helps: str = Field(..., description="1 sentence on how this closes the gap for this JD")
+
+
 class ImprovementPlan(BaseModel):
     """Guidance for closing the gap on a low-scoring CV/JD match."""
 
@@ -46,6 +60,10 @@ class ImprovementPlan(BaseModel):
             "the gap toward the target score - concrete directions (what to add, quantify, "
             "reorder, or remove), not rewritten resume text"
         ),
+    )
+    recommended_courses: list[CourseSuggestion] = Field(
+        default_factory=list,
+        description="Upskilling suggestions (course/certification types) for the biggest gaps",
     )
 
 

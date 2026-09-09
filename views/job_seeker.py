@@ -65,9 +65,16 @@ def render() -> None:
 
         agent = ATSAgent(api_key=api_key)
 
+        with st.spinner("Reading your CV..."):
+            try:
+                resume_md = agent.cv_to_markdown(resume_text)
+            except ATSAgentError as e:
+                st.error(str(e))
+                st.stop()
+
         with st.spinner("Analyzing match..."):
             try:
-                result = agent.analyze(resume_text, job_description)
+                result = agent.analyze(resume_md, job_description)
             except ATSAgentError as e:
                 st.error(str(e))
                 st.stop()
@@ -80,14 +87,14 @@ def render() -> None:
             with st.spinner("Working out how to close the gap..."):
                 try:
                     st.session_state["js_last_improvement_plan"] = agent.suggest_improvement_plan(
-                        resume_text, job_description, result
+                        resume_md, job_description, result
                     )
                 except ATSAgentError as e:
                     st.warning(f"Couldn't generate an improvement plan: {e}")
 
             with st.spinner("Looking for roles that fit your CV..."):
                 try:
-                    st.session_state["js_last_job_suggestions"] = agent.suggest_jobs(resume_text)
+                    st.session_state["js_last_job_suggestions"] = agent.suggest_jobs(resume_md)
                 except ATSAgentError as e:
                     st.warning(f"Couldn't generate job suggestions: {e}")
 

@@ -11,6 +11,7 @@ from google.genai import errors, types
 
 from .models import ImprovementPlan, JobSuggestions, MatchResult
 from .prompts import (
+    CV_TO_MARKDOWN_SYSTEM_PROMPT,
     IMPROVEMENT_PLAN_SYSTEM_PROMPT,
     JOB_SUGGESTIONS_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
@@ -42,6 +43,21 @@ class ATSAgent:
     def __init__(self, api_key: str | None = None, model: str = DEFAULT_MODEL):
         self.client = genai.Client(api_key=api_key) if api_key else genai.Client()
         self.model = model
+
+    def cv_to_markdown(self, resume_text: str) -> str:
+        """Clean/reformat raw extracted CV text into compact Markdown.
+
+        Downstream calls (analyze, suggest_improvement_plan, suggest_jobs) should
+        be given this Markdown version rather than the raw extracted text - it
+        strips PDF/DOCX extraction noise (repeated headers, stray breaks, excess
+        whitespace) so later calls spend fewer tokens re-parsing it, and the same
+        cleaned version can be reused across all of them instead of re-sending
+        raw text each time.
+        """
+        resume_text = resume_text.strip()[:MAX_DOCUMENT_CHARS]
+        if not resume_text:
+            raise ATSAgentError("The CV appears to be empty or unreadable.")
+        return self._generate_text(CV_TO_MARKDOWN_SYSTEM_PROMPT, resume_text)
 
     def analyze(self, resume_text: str, job_description: str) -> MatchResult:
         resume_text, job_description = self._prepare_documents(resume_text, job_description)
@@ -97,16 +113,17 @@ class ATSAgent:
 
         return resume_text[:MAX_DOCUMENT_CHARS], job_description[:MAX_DOCUMENT_CHARS]
 
-    def _generate(self, system_prompt: str, user_prompt: str, schema: type[SchemaT]) -> SchemaT:
+    def _call(self, system_prompt: str, user_prompt: str, *, schema: type[BaseModel] | None = None):
+        config_kwargs: dict = {"system_instruction": system_prompt}
+        if schema is not None:
+            config_kwargs["response_mime_type"] = "application/json"
+            config_kwargs["response_schema"] = schema
+
         try:
-            response = self.client.models.generate_content(
+            return self.client.models.generate_content(
                 model=self.model,
                 contents=user_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    response_mime_type="application/json",
-                    response_schema=schema,
-                ),
+                config=types.GenerateContentConfig(**config_kwargs),
             )
         except errors.ClientError as e:
             if e.code in (401, 403):
@@ -121,7 +138,15 @@ class ATSAgent:
         except errors.APIError as e:
             raise ATSAgentError(f"Gemini API error: {e.message}") from e
 
+    def _generate(self, system_prompt: str, user_prompt: str, schema: type[SchemaT]) -> SchemaT:
+        response = self._call(system_prompt, user_prompt, schema=schema)
         if response.parsed is None:
             raise ATSAgentError("The model did not return a valid structured response.")
-
         return response.parsed
+
+    def _generate_text(self, system_prompt: str, user_prompt: str) -> str:
+        response = self._call(system_prompt, user_prompt)
+        text = (response.text or "").strip()
+        if not text:
+            raise ATSAgentError("The model did not return any content.")
+        return text

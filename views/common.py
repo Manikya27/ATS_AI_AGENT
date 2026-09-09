@@ -3,9 +3,14 @@ from __future__ import annotations
 
 import os
 
+import pandas as pd
 import streamlit as st
 
 from ats_agent.models import ImprovementPlan, JobSuggestions, MatchResult
+
+# Validated categorical palette slots (blue, orange) - see project dataviz guidance.
+COLOR_MATCHED = "#2a78d6"
+COLOR_MISSING = "#eb6834"
 
 
 def get_api_key() -> str | None:
@@ -76,6 +81,16 @@ def render_result(result: MatchResult) -> None:
         else:
             st.caption("None identified.")
 
+    if result.matched_skills or result.missing_skills:
+        st.markdown("**📊 Skill match breakdown**")
+        chart_df = pd.DataFrame(
+            {
+                "Matched": [len(result.matched_skills)],
+                "Missing": [len(result.missing_skills)],
+            }
+        )
+        st.bar_chart(chart_df, color=[COLOR_MATCHED, COLOR_MISSING], stack=False, height=220)
+
     st.divider()
     st.markdown("**📝 Suggestions to improve the match**")
     if result.suggestions:
@@ -90,6 +105,17 @@ def render_improvement_plan(plan: ImprovementPlan) -> None:
     st.write(plan.gap_analysis)
     for item in plan.action_items:
         st.markdown(f"- {item}")
+
+    if plan.recommended_courses:
+        st.markdown("##### 📚 Courses worth exploring")
+        st.caption(
+            "A little upskilling here goes a long way - these are AI-suggested learning "
+            "paths for your biggest gaps, not specific real courses or providers."
+        )
+        for course in plan.recommended_courses:
+            with st.expander(course.skill_or_topic):
+                st.write(course.course_suggestion)
+                st.caption(course.why_it_helps)
 
 
 def render_job_suggestions(jobs: JobSuggestions) -> None:

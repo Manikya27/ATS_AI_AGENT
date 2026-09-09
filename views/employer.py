@@ -4,13 +4,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 from ats_agent import ATSAgent, ATSAgentError
 from ats_agent.models import MatchResult
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
 from ats_agent.scheduling import MEETING_ELIGIBLE_THRESHOLD, extract_email, google_calendar_meeting_link
-from views.common import render_result, require_api_key
+from views.common import COLOR_MATCHED, render_result, require_api_key
 
 MAX_CANDIDATES = 20
 
@@ -81,12 +82,13 @@ def render() -> None:
         for i, resume_file in enumerate(resume_files):
             try:
                 resume_text = extract_text(resume_file.getvalue(), resume_file.name)
-                result = agent.analyze(resume_text, job_description)
+                resume_md = agent.cv_to_markdown(resume_text)
+                result = agent.analyze(resume_md, job_description)
                 candidates.append(
                     CandidateResult(
                         filename=resume_file.name,
                         result=result,
-                        email=extract_email(resume_text),
+                        email=extract_email(resume_md),
                     )
                 )
             except (UnsupportedFileType, ATSAgentError) as e:
@@ -121,6 +123,15 @@ def render() -> None:
             for i, c in enumerate(ranked)
         ]
         st.dataframe(table_rows, width="stretch", hide_index=True)
+
+        scored = [c for c in ranked if c.result is not None]
+        if scored:
+            st.markdown("**📊 Match score by candidate**")
+            chart_df = pd.DataFrame(
+                {"Match %": [c.result.match_percentage for c in scored]},
+                index=[c.filename for c in scored],
+            )
+            st.bar_chart(chart_df, y="Match %", color=COLOR_MATCHED, sort=False, height=280)
 
         st.subheader("Candidate details")
         for i, c in enumerate(ranked):
