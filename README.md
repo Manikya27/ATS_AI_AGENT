@@ -3,7 +3,9 @@
 An AI agent that acts as an ATS (Applicant Tracking System), served as a two-view web app:
 
 - **Job Seeker view** - upload your CV and a job description, get a match score, missing
-  skills, and concrete edits to improve your chances.
+  skills, and concrete edits to improve your chances. If the match scores below 50%, the
+  agent also generates a targeted improvement plan (aimed at ~75%) and suggests other job
+  titles that better fit your existing CV.
 - **Employer view** - paste a job description once, upload multiple candidate CVs, and get a
   ranked shortlist by match percentage.
 
@@ -20,6 +22,10 @@ Both views share the same core agent, packaged as a small, reusable product
   - strengths and gaps
   - actionable suggestions to improve the CV
 - Employer view screens up to 20 CVs per run and ranks them by match %
+- Below a 50% match, the Job Seeker view adds:
+  - a gap analysis + specific, prioritized action items to raise the score toward 75%
+  - AI-suggested job titles that better fit the candidate's existing CV, with search keywords
+    (these are AI-generated suggestions based on the CV, not live job market listings)
 - Runs on **Google Gemini's free tier** (`gemini-2.5-flash` by default) - no paid API required
 - Dockerized for hosting as a service (Render, Railway, Fly.io, or any container host)
 
@@ -32,10 +38,11 @@ views/
   employer.py               Employer view - bulk CV screening + ranked shortlist
   common.py                  Shared UI helpers (API key handling, result rendering)
 ats_agent/
-  agent.py                  ATSAgent - the product: analyze(resume_text, jd_text) -> MatchResult
-  models.py                   MatchResult schema (Pydantic)
+  agent.py                  ATSAgent - the product's core (analyze, suggest_improvement_plan,
+                             suggest_jobs)
+  models.py                   Pydantic schemas: MatchResult, ImprovementPlan, JobSuggestions
   parsers.py                   PDF/DOCX/TXT text extraction
-  prompts.py                   System prompt for the matching agent
+  prompts.py                   System prompts for each agent capability
 Dockerfile                 Container image for hosting the app as a service
 ```
 
@@ -92,11 +99,19 @@ throttling/queuing in front of the agent.
 ## Using the agent programmatically
 
 ```python
-from ats_agent import ATSAgent
+from ats_agent import ATSAgent, LOW_MATCH_THRESHOLD
 
 agent = ATSAgent()  # reads GEMINI_API_KEY from the environment
 result = agent.analyze(resume_text, job_description_text)
 
 print(result.match_percentage, result.verdict)
 print(result.missing_skills)
+
+if result.match_percentage < LOW_MATCH_THRESHOLD:
+    plan = agent.suggest_improvement_plan(resume_text, job_description_text, result)
+    print(plan.gap_analysis, plan.action_items)
+
+    jobs = agent.suggest_jobs(resume_text)
+    for job in jobs.suggestions:
+        print(job.title, job.search_keywords)
 ```

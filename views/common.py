@@ -5,7 +5,7 @@ import os
 
 import streamlit as st
 
-from ats_agent.models import MatchResult
+from ats_agent.models import ImprovementPlan, JobSuggestions, MatchResult
 
 
 def get_api_key() -> str | None:
@@ -82,3 +82,28 @@ def render_result(result: MatchResult) -> None:
             st.markdown(f"- {suggestion}")
     else:
         st.caption("No suggestions.")
+
+
+def render_improvement_plan(plan: ImprovementPlan) -> None:
+    st.markdown(f"#### 📈 How to reach ~{plan.target_match_percentage}% match")
+    st.write(plan.gap_analysis)
+    for item in plan.action_items:
+        st.markdown(f"- {item}")
+
+
+def render_job_suggestions(jobs: JobSuggestions) -> None:
+    st.markdown("#### 🔎 Roles that might fit your CV better")
+    st.caption(
+        "AI-generated suggestions based on your CV's skills and experience - not live job "
+        "market listings."
+    )
+    if not jobs.suggestions:
+        st.caption("No suggestions.")
+        return
+
+    for job in jobs.suggestions:
+        with st.expander(f"{job.title} ({job.seniority})"):
+            st.write(job.why_fit)
+            if job.key_skills_matched:
+                st.markdown("**Matching skills from your CV:** " + ", ".join(job.key_skills_matched))
+            st.markdown(f"**Try searching:** `{job.search_keywords}`")

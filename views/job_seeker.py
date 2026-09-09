@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ats_agent import ATSAgent, ATSAgentError
+from ats_agent import ATSAgent, ATSAgentError, LOW_MATCH_THRESHOLD
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
-from views.common import render_result, require_api_key
+from views.common import render_improvement_plan, render_job_suggestions, render_result, require_api_key
 
 st.title("🧑‍💻 Job Seeker: Check Your CV")
 st.write(
@@ -61,16 +61,44 @@ if analyze_clicked:
         st.error("Please provide a job description (upload a file or paste text).")
         st.stop()
 
+    agent = ATSAgent(api_key=api_key)
+
     with st.spinner("Analyzing match..."):
         try:
-            agent = ATSAgent(api_key=api_key)
             result = agent.analyze(resume_text, job_description)
         except ATSAgentError as e:
             st.error(str(e))
             st.stop()
 
     st.session_state["js_last_result"] = result
+    st.session_state["js_last_improvement_plan"] = None
+    st.session_state["js_last_job_suggestions"] = None
+
+    if result.match_percentage < LOW_MATCH_THRESHOLD:
+        with st.spinner("Working out how to close the gap..."):
+            try:
+                st.session_state["js_last_improvement_plan"] = agent.suggest_improvement_plan(
+                    resume_text, job_description, result
+                )
+            except ATSAgentError as e:
+                st.warning(f"Couldn't generate an improvement plan: {e}")
+
+        with st.spinner("Looking for roles that fit your CV..."):
+            try:
+                st.session_state["js_last_job_suggestions"] = agent.suggest_jobs(resume_text)
+            except ATSAgentError as e:
+                st.warning(f"Couldn't generate job suggestions: {e}")
 
 if "js_last_result" in st.session_state:
     st.divider()
     render_result(st.session_state["js_last_result"])
+
+    improvement_plan = st.session_state.get("js_last_improvement_plan")
+    if improvement_plan is not None:
+        st.divider()
+        render_improvement_plan(improvement_plan)
+
+    job_suggestions = st.session_state.get("js_last_job_suggestions")
+    if job_suggestions is not None:
+        st.divider()
+        render_job_suggestions(job_suggestions)

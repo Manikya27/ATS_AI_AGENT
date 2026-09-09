@@ -1,4 +1,12 @@
-from .agent import ATSAgent, ATSAgentError
-from .models import MatchResult
+from .agent import ATSAgent, ATSAgentError, LOW_MATCH_THRESHOLD
+from .models import ImprovementPlan, JobSuggestion, JobSuggestions, MatchResult
 
-__all__ = ["ATSAgent", "ATSAgentError", "MatchResult"]
+__all__ = [
+    "ATSAgent",
+    "ATSAgentError",
+    "LOW_MATCH_THRESHOLD",
+    "ImprovementPlan",
+    "JobSuggestion",
+    "JobSuggestions",
+    "MatchResult",
+]
