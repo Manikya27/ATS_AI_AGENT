@@ -11,7 +11,8 @@ from ats_agent import ATSAgent, ATSAgentError
 from ats_agent.models import MatchResult
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
 from ats_agent.scheduling import MEETING_ELIGIBLE_THRESHOLD, extract_email, google_calendar_meeting_link
-from views.common import COLOR_MATCHED, render_result, require_api_key
+from views.common import COLOR_MATCHED, record_usage, render_result, require_api_key
+from views.theme import ACCENT_POSITIVE, section_label, step_label, view_header
 
 MAX_CANDIDATES = 20
 
@@ -25,13 +26,13 @@ class CandidateResult:
 
 
 def render() -> None:
-    st.header("🏢 Employer: Screen Candidates")
-    st.write(
+    view_header(
+        "Screen candidates against a role",
         "Provide the job description once, upload multiple candidate CVs, and get a ranked "
-        "shortlist by match percentage."
+        "shortlist by match percentage.",
     )
 
-    st.subheader("1. Job Description")
+    step_label("01", "Job description")
     jd_file = st.file_uploader(
         "Upload JD (optional)", type=list(SUPPORTED_EXTENSIONS), key="em_jd_file"
     )
@@ -39,7 +40,7 @@ def render() -> None:
         "...or paste the job description here", height=200, key="em_jd_text"
     )
 
-    st.subheader("2. Candidate CVs")
+    step_label("02", "Candidate CVs")
     resume_files = st.file_uploader(
         "Upload CVs (multiple)",
         type=list(SUPPORTED_EXTENSIONS),
@@ -101,6 +102,7 @@ def render() -> None:
 
         progress.empty()
         st.session_state["em_last_candidates"] = candidates
+        record_usage(cvs=sum(1 for c in candidates if c.result is not None))
 
     if "em_last_candidates" in st.session_state:
         candidates: list[CandidateResult] = st.session_state["em_last_candidates"]
@@ -118,7 +120,7 @@ def render() -> None:
                 "Rank": i + 1,
                 "Candidate": c.filename,
                 "Match %": c.result.match_percentage if c.result else None,
-                "Verdict": c.result.verdict if c.result else f"⚠️ {c.error}",
+                "Verdict": c.result.verdict if c.result else f"Failed: {c.error}",
             }
             for i, c in enumerate(ranked)
         ]
@@ -126,7 +128,7 @@ def render() -> None:
 
         scored = [c for c in ranked if c.result is not None]
         if scored:
-            st.markdown("**📊 Match score by candidate**")
+            section_label("Match score by candidate")
             chart_df = pd.DataFrame(
                 {"Match %": [c.result.match_percentage for c in scored]},
                 index=[c.filename for c in scored],
@@ -136,7 +138,7 @@ def render() -> None:
         st.subheader("Candidate details")
         for i, c in enumerate(ranked):
             if c.result is None:
-                st.markdown(f"**{c.filename}** — ⚠️ {c.error}")
+                st.markdown(f"**{c.filename}** — could not be screened: {c.error}")
                 continue
             with st.expander(f"{c.filename} — {c.result.match_percentage}% match"):
                 render_result(c.result)
@@ -146,7 +148,7 @@ def render() -> None:
 
 def _render_scheduling(candidate: CandidateResult, index: int) -> None:
     st.divider()
-    st.markdown("**📅 Schedule an interview**")
+    section_label("Schedule an interview", ACCENT_POSITIVE)
     st.caption(
         "This candidate cleared the shortlist threshold. Confirm their email, then open a "
         "pre-filled Google Calendar invite - add Google Meet video conferencing there."
@@ -162,4 +164,4 @@ def _render_scheduling(candidate: CandidateResult, index: int) -> None:
     url = google_calendar_meeting_link(
         candidate_label, email or None, candidate.result.match_percentage
     )
-    st.link_button("📅 Schedule Google Meet interview", url, width="content")
+    st.link_button("Schedule Google Meet interview", url, width="content")
