@@ -8,7 +8,8 @@ Job Seeker and Employer are selected via tabs at the top of the page:
   generates a targeted improvement plan (aimed at ~75%) and suggests other job titles that
   better fit your existing CV.
 - **Employer** - paste a job description once, upload multiple candidate CVs, and get a ranked
-  shortlist by match percentage.
+  shortlist by match percentage. Candidates at 75% or above get a one-click "Schedule Google
+  Meet interview" action, pre-filled with the candidate's email (extracted from their CV).
 
 Both views share the same core agent, packaged as a small, reusable product
 ([`ats_agent`](./ats_agent), `ATSAgent`) rather than a one-off script.
@@ -26,6 +27,10 @@ either; there's no key input and no model name anywhere in the UI.
   - strengths and gaps
   - actionable suggestions to improve the CV
 - Employer view screens up to 20 CVs per run and ranks them by match %
+- At 75%+ match, the Employer view offers a "Schedule Google Meet interview" action: the
+  candidate's email is extracted from their CV (editable if missed or wrong), and the button
+  opens a pre-filled Google Calendar event - no Google account/OAuth setup required. The
+  employer picks the final time and adds Google Meet video conferencing from Calendar.
 - Below a 50% match, the Job Seeker view adds:
   - a gap analysis + specific, prioritized action items to raise the score toward 75%
   - AI-suggested job titles that better fit the candidate's existing CV, with search keywords
@@ -47,6 +52,7 @@ ats_agent/
   models.py                   Pydantic schemas: MatchResult, ImprovementPlan, JobSuggestions
   parsers.py                   PDF/DOCX/TXT text extraction
   prompts.py                   System prompts for each agent capability
+  scheduling.py                 CV email extraction + Google Calendar meeting link builder
 Dockerfile                 Container image for hosting the app as a service
 ```
 

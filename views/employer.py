@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import streamlit as st
 
 from ats_agent import ATSAgent, ATSAgentError
 from ats_agent.models import MatchResult
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
+from ats_agent.scheduling import MEETING_ELIGIBLE_THRESHOLD, extract_email, google_calendar_meeting_link
 from views.common import render_result, require_api_key
 
 MAX_CANDIDATES = 20
@@ -18,6 +20,7 @@ class CandidateResult:
     filename: str
     result: MatchResult | None
     error: str | None = None
+    email: str | None = None
 
 
 def render() -> None:
@@ -47,7 +50,7 @@ def render() -> None:
         resume_files = resume_files[:MAX_CANDIDATES]
 
     screen_clicked = st.button(
-        "Screen candidates", type="primary", use_container_width=True, key="em_screen"
+        "Screen candidates", type="primary", width="stretch", key="em_screen"
     )
 
     if screen_clicked:
@@ -79,7 +82,13 @@ def render() -> None:
             try:
                 resume_text = extract_text(resume_file.getvalue(), resume_file.name)
                 result = agent.analyze(resume_text, job_description)
-                candidates.append(CandidateResult(filename=resume_file.name, result=result))
+                candidates.append(
+                    CandidateResult(
+                        filename=resume_file.name,
+                        result=result,
+                        email=extract_email(resume_text),
+                    )
+                )
             except (UnsupportedFileType, ATSAgentError) as e:
                 candidates.append(
                     CandidateResult(filename=resume_file.name, result=None, error=str(e))
@@ -111,12 +120,35 @@ def render() -> None:
             }
             for i, c in enumerate(ranked)
         ]
-        st.dataframe(table_rows, use_container_width=True, hide_index=True)
+        st.dataframe(table_rows, width="stretch", hide_index=True)
 
         st.subheader("Candidate details")
-        for c in ranked:
+        for i, c in enumerate(ranked):
             if c.result is None:
                 st.markdown(f"**{c.filename}** — ⚠️ {c.error}")
                 continue
             with st.expander(f"{c.filename} — {c.result.match_percentage}% match"):
                 render_result(c.result)
+                if c.result.match_percentage >= MEETING_ELIGIBLE_THRESHOLD:
+                    _render_scheduling(c, i)
+
+
+def _render_scheduling(candidate: CandidateResult, index: int) -> None:
+    st.divider()
+    st.markdown("**📅 Schedule an interview**")
+    st.caption(
+        "This candidate cleared the shortlist threshold. Confirm their email, then open a "
+        "pre-filled Google Calendar invite - add Google Meet video conferencing there."
+    )
+    email = st.text_input(
+        "Candidate email",
+        value=candidate.email or "",
+        placeholder="Not found in CV - enter manually",
+        key=f"em_email_{index}",
+    )
+
+    candidate_label = Path(candidate.filename).stem
+    url = google_calendar_meeting_link(
+        candidate_label, email or None, candidate.result.match_percentage
+    )
+    st.link_button("📅 Schedule Google Meet interview", url, width="content")
