@@ -10,8 +10,8 @@ from __future__ import annotations
 import streamlit as st
 
 from ats_agent.stats import load_stats
-from views import employer, job_seeker, landing
-from views.router import EMPLOYER, HOME, JOB_SEEKER, current_view
+from views import assistant, employer, job_seeker, landing
+from views.router import ASSISTANT, EMPLOYER, HOME, JOB_SEEKER, current_view
 from views.theme import inject_theme, render_navbar
 
 st.set_page_config(page_title="Employee 360", page_icon="🎯", layout="wide")
@@ -29,3 +29,5 @@ else:
         job_seeker.render()
     elif view == EMPLOYER:
         employer.render()
+    elif view == ASSISTANT:
+        assistant.render()
