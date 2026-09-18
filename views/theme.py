@@ -411,6 +411,58 @@ _CSS = f"""
     border-radius: 0.7rem;
     border: 1px solid {BORDER};
   }}
+
+  /* ---- Keyword chips -----------------------------------------------
+     A keyword list is read by scanning, not reading, so the terms are set
+     as chips. Colour is a secondary cue: the group heading above them
+     always says which state they are in. */
+  .e360-chips {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.1rem 0 0.9rem;
+  }}
+  .e360-chip {{
+    display: inline-block;
+    padding: 0.28rem 0.62rem;
+    border-radius: 0.45rem;
+    font-size: 0.83rem;
+    font-weight: 600;
+    line-height: 1.25;
+    border: 1px solid {BORDER};
+    color: {TEXT};
+    background: {SURFACE};
+  }}
+  .e360-chip.is-missing {{
+    border-color: rgba(95, 160, 234, 0.55);
+    background: rgba(95, 160, 234, 0.12);
+  }}
+  .e360-chip.is-partial {{
+    border-color: rgba(255, 122, 31, 0.5);
+    background: rgba(255, 122, 31, 0.11);
+  }}
+  .e360-chip.is-present {{
+    color: {MUTED};
+  }}
+  .e360-chip small {{
+    font-weight: 500;
+    opacity: 0.7;
+    margin-left: 0.3rem;
+  }}
+
+  /* ---- Prior-candidate badge --------------------------------------- */
+  .e360-badge {{
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: {ORANGE};
+    border: 1px solid rgba(255, 122, 31, 0.45);
+    background: rgba(255, 122, 31, 0.1);
+  }}
 </style>
 """
 
@@ -450,6 +502,21 @@ def section_label(text: str, accent: str = MUTED) -> None:
         f'<div class="e360-label" style="color:{accent}">{html.escape(text)}</div>',
         unsafe_allow_html=True,
     )
+
+
+def keyword_chips(labels: list[str], state: str) -> None:
+    """A row of keyword chips. `state` is one of missing/partial/present."""
+    if not labels:
+        return
+    chips = "".join(
+        f'<span class="e360-chip is-{state}">{html.escape(label)}</span>' for label in labels
+    )
+    st.markdown(f'<div class="e360-chips">{chips}</div>', unsafe_allow_html=True)
+
+
+def badge(text: str) -> str:
+    """Inline badge markup, for callers building a larger markdown block."""
+    return f'<span class="e360-badge">{html.escape(text)}</span>'
 
 
 def render_stat_tiles(stats: UsageStats, note: str | None = None) -> None:

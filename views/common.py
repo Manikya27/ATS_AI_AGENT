@@ -6,9 +6,9 @@ import os
 import pandas as pd
 import streamlit as st
 
-from ats_agent.models import ImprovementPlan, JobSuggestions, MatchResult
+from ats_agent.models import CVReview, ImprovementPlan, JobSuggestions, MatchResult
 from ats_agent.stats import record_run
-from views.theme import ACCENT_NEUTRAL, ACCENT_POSITIVE, section_label
+from views.theme import ACCENT_NEUTRAL, ACCENT_POSITIVE, keyword_chips, section_label
 
 # Brand orange + blue, validated against the dark chart surface (lightness band,
 # chroma floor, CVD separation, contrast).
@@ -150,3 +150,99 @@ def render_job_suggestions(jobs: JobSuggestions) -> None:
             if job.key_skills_matched:
                 st.markdown("**Matching skills from your CV:** " + ", ".join(job.key_skills_matched))
             st.markdown(f"**Try searching:** `{job.search_keywords}`")
+
+
+# Status order for the keyword report: the two the candidate can act on come
+# first, and "present" last as reassurance rather than as the headline.
+_KEYWORD_GROUPS = (
+    (
+        "missing",
+        "Missing from your CV",
+        ACCENT_NEUTRAL,
+        "The role asks for these and your CV never says them. Add the ones you can back up "
+        "with real experience; treat the rest as what to build next.",
+    ),
+    (
+        "partial",
+        "You have this - you just don't say it",
+        ACCENT_POSITIVE,
+        "Your experience is here, worded differently. These are the cheapest points on the "
+        "page: reword the bullet you already have so it uses the role's term.",
+    ),
+    (
+        "present",
+        "Already covered",
+        ACCENT_POSITIVE,
+        "Your CV uses these terms. Keep them where a skim will find them.",
+    ),
+)
+
+
+def render_cv_review(review: CVReview) -> None:
+    """The keyword screen and the layout advice - what to change before applying."""
+    st.markdown("#### Keywords this role screens for")
+    st.caption(
+        "Recruiters and keyword filters match on the words themselves, so a CV can hold the "
+        "right experience under the wrong label and never be read. These terms are taken "
+        "from the job description you supplied."
+    )
+    st.write(review.keyword_summary)
+
+    by_status = {status: [] for status, _, _, _ in _KEYWORD_GROUPS}
+    for hit in review.keywords:
+        by_status.setdefault(hit.status, []).append(hit)
+
+    if review.keywords:
+        counts = {status: len(hits) for status, hits in by_status.items()}
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric("Missing", counts.get("missing", 0))
+        col_b.metric("Worded differently", counts.get("partial", 0))
+        col_c.metric("Already covered", counts.get("present", 0))
+
+        covered = counts.get("present", 0) + counts.get("partial", 0)
+        chart_df = pd.DataFrame(
+            {"Covered": [covered], "Missing": [counts.get("missing", 0)]}
+        )
+        st.bar_chart(chart_df, color=[COLOR_MATCHED, COLOR_MISSING], stack=False, height=170)
+
+    for status, heading, accent, blurb in _KEYWORD_GROUPS:
+        hits = by_status.get(status) or []
+        if not hits:
+            continue
+        section_label(heading, accent)
+        st.caption(blurb)
+        # Core requirements are the ones that decide the screen, so they are
+        # chipped separately from the nice-to-haves rather than mixed in.
+        for importance, label in (("core", "Required"), ("preferred", "Preferred")):
+            group = [h for h in hits if h.importance == importance]
+            if not group:
+                continue
+            st.markdown(f"**{label}**")
+            keyword_chips([h.keyword for h in group], status)
+
+        if status != "present":
+            with st.expander(f"What to do about each ({len(hits)})"):
+                for hit in hits:
+                    st.markdown(f"**{hit.keyword}** - {hit.advice}")
+
+    st.caption(
+        "Only add a keyword your experience genuinely supports. Padding a CV with terms you "
+        "can't speak to in an interview costs you the interview, and hidden keyword blocks "
+        "are filtered out by every modern screen."
+    )
+
+    st.divider()
+    st.markdown("#### Make the CV itself land harder")
+    st.write(review.format_summary)
+
+    if review.suggested_structure:
+        section_label("Suggested running order for this role")
+        for i, section in enumerate(review.suggested_structure, start=1):
+            st.markdown(f"{i}. {section}")
+
+    if review.format_tips:
+        section_label("Specific changes")
+        for tip in review.format_tips:
+            with st.expander(f"{tip.area} - {tip.impact} impact"):
+                st.markdown(f"**Today:** {tip.issue}")
+                st.markdown(f"**Change to:** {tip.fix}")

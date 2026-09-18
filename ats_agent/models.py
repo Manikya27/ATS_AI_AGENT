@@ -1,5 +1,7 @@
-"""Structured output schema for the ATS matching result."""
+"""Structured output schemas for the ATS matching result."""
 from __future__ import annotations
+
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -83,3 +85,78 @@ class JobSuggestion(BaseModel):
 
 class JobSuggestions(BaseModel):
     suggestions: list[JobSuggestion] = Field(default_factory=list)
+
+
+class KeywordHit(BaseModel):
+    """One term the job description leans on, and whether the CV actually says it.
+
+    Distinct from `MatchResult.missing_skills`, which is a judgment about
+    capability. This is about literal vocabulary: keyword screens and recruiters
+    skimming for terms match on the words themselves, so a candidate can have
+    the skill and still fail the screen for never naming it.
+    """
+
+    keyword: str = Field(
+        ..., description="The term as the job description words it, e.g. 'Kubernetes', 'stakeholder management'"
+    )
+    status: Literal["present", "partial", "missing"] = Field(
+        ...,
+        description=(
+            "present: the CV uses this term (or an unmistakable equivalent). "
+            "partial: the CV shows the underlying experience but never names it this way, "
+            "or names it only in passing. "
+            "missing: the term and the experience behind it are both absent."
+        ),
+    )
+    importance: Literal["core", "preferred"] = Field(
+        ...,
+        description=(
+            "core: the JD lists it as required/must-have. preferred: nice-to-have, "
+            "bonus, or mentioned once in passing."
+        ),
+    )
+    advice: str = Field(
+        ...,
+        description=(
+            "One sentence. For present: where it already appears. For partial: which "
+            "existing bullet to reword so the term appears. For missing: whether it can "
+            "be added truthfully from real experience, or has to be built first."
+        ),
+    )
+
+
+class FormatTip(BaseModel):
+    """One concrete change to how the CV is laid out or written."""
+
+    area: str = Field(
+        ..., description="What part of the CV this concerns, e.g. 'Section order', 'Bullet phrasing', 'Contact block'"
+    )
+    issue: str = Field(..., description="What this CV does today - specific to the document supplied")
+    fix: str = Field(..., description="The concrete change to make, in one or two sentences")
+    impact: Literal["high", "medium", "low"] = Field(
+        ..., description="How much this change is worth relative to the others"
+    )
+
+
+class CVReview(BaseModel):
+    """Keyword coverage and formatting advice for one CV against one role."""
+
+    keyword_summary: str = Field(
+        ..., description="2-3 sentences on how well this CV's vocabulary lines up with the role's"
+    )
+    keywords: list[KeywordHit] = Field(
+        default_factory=list, description="The terms this role screens on, present and missing alike"
+    )
+    format_summary: str = Field(
+        ..., description="2-3 sentences on how this CV reads and parses today"
+    )
+    suggested_structure: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The section order that would serve this candidate best for this role, "
+            "top to bottom, each with a few words on what belongs in it"
+        ),
+    )
+    format_tips: list[FormatTip] = Field(
+        default_factory=list, description="Specific layout and phrasing changes, highest impact first"
+    )

@@ -7,6 +7,7 @@ from ats_agent import ATSAgent, ATSAgentError, STRONG_MATCH_THRESHOLD
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
 from views.common import (
     record_usage,
+    render_cv_review,
     render_improvement_plan,
     render_job_suggestions,
     render_result,
@@ -87,8 +88,24 @@ def render() -> None:
                 st.stop()
 
         st.session_state["js_last_result"] = result
+        st.session_state["js_last_cv_review"] = None
         st.session_state["js_last_improvement_plan"] = None
         st.session_state["js_last_job_suggestions"] = None
+        # Recording the run reruns the script, which throws away anything already
+        # drawn - so a step that fails has to leave its message in state rather
+        # than calling st.warning here, or the section just vanishes silently.
+        warnings: list[str] = []
+        st.session_state["js_last_warnings"] = warnings
+
+        # Runs at every score: the keyword screen is what decides whether a CV is
+        # read at all, so a strong match needs it as much as a weak one.
+        with st.spinner("Checking the CV against the role's own wording..."):
+            try:
+                st.session_state["js_last_cv_review"] = agent.review_cv(
+                    resume_md, job_description
+                )
+            except ATSAgentError as e:
+                warnings.append(f"Couldn't run the keyword and formatting check: {e}")
 
         # Anything short of a strong match gets the plan: the gap is worth closing
         # whether it is a couple of points or a career step.
@@ -99,7 +116,7 @@ def render() -> None:
                         resume_md, job_description, result
                     )
                 except ATSAgentError as e:
-                    st.warning(f"Couldn't generate an improvement plan: {e}")
+                    warnings.append(f"Couldn't generate an improvement plan: {e}")
 
         # Similar roles are useful at any score - a strong match still wants other
         # openings of the same kind to apply to.
@@ -109,13 +126,21 @@ def render() -> None:
                     resume_md, job_description
                 )
             except ATSAgentError as e:
-                st.warning(f"Couldn't suggest similar roles: {e}")
+                warnings.append(f"Couldn't suggest similar roles: {e}")
 
         record_usage(cvs=1)
 
     if "js_last_result" in st.session_state:
         st.divider()
+        for message in st.session_state.get("js_last_warnings") or []:
+            st.warning(message)
+
         render_result(st.session_state["js_last_result"])
+
+        cv_review = st.session_state.get("js_last_cv_review")
+        if cv_review is not None:
+            st.divider()
+            render_cv_review(cv_review)
 
         improvement_plan = st.session_state.get("js_last_improvement_plan")
         if improvement_plan is not None:

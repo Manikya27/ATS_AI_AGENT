@@ -12,6 +12,7 @@ from .scheduling import (
     DEFAULT_MEETING_DURATION_MINUTES,
     MEETING_ELIGIBLE_THRESHOLD,
 )
+from .talent_pool import MAX_RESCREEN, RETENTION_DAYS
 
 # How many CVs the Employer view screens in one run. Lives here rather than in
 # the view so the assistant quotes the same number the UI enforces.
@@ -42,6 +43,18 @@ with its own URL: Job Seeker (`?view=job-seeker`) and Employer (`?view=employer`
 - The plan also suggests the *kinds* of courses or certifications that would
   close the biggest skill gaps. These are described course types, not real
   named courses from a catalogue, and no provider is endorsed.
+- Every analysis also runs a keyword check against the job description's own
+  wording. Terms the role screens on are listed as present, worded differently,
+  or missing, split into required and preferred, with a note on what to do about
+  each and a chart of covered against missing.
+- The point of that check is that keyword filters and skimming recruiters match
+  on the words, so a CV can hold the right experience under the wrong label and
+  never be read. The app tells people to add only terms their experience
+  genuinely supports, and never to stuff keywords or hide them in the document.
+- The same step reviews the CV as a document: how it reads today, the section
+  order that would suit this role, and specific changes to layout and phrasing,
+  each marked high, medium or low impact. It judges the cleaned text, so it
+  cannot comment on fonts, colours or margins.
 - Every analysis also suggests similar roles worth searching for: jobs of the
   same kind as the one they are targeting that their CV already supports, each
   with search keywords to paste into a job board. These appear at any score,
@@ -65,6 +78,27 @@ with its own URL: Job Seeker (`?view=job-seeker`) and Employer (`?view=employer`
   video conferencing, and sends the invite. No Google sign-in or setup is needed
   for the app itself.
 
+## Talent pool (Employer view)
+- The employer can tick a box to save the CVs from a screening run. It is off by
+  default, and nothing is saved unless it is ticked for that run.
+- What gets saved is the cleaned text of the CV, the filename it arrived under,
+  and the email address found in it. The original uploaded file is not kept.
+- Whenever a job description is screened, saved CVs are also scored against it,
+  and any scoring {MEETING_ELIGIBLE_THRESHOLD}% or above are shown in a separate "already in your
+  talent pool" section, below the shortlist for the CVs just uploaded. This
+  happens whether or not the current batch is being saved.
+- At most {MAX_RESCREEN} saved CVs are re-scored per run. Which ones is decided by plain
+  word overlap between the role and each saved CV - no model call - because
+  every actual scoring costs a request.
+- A CV in the current upload that is already in the pool is marked as screened
+  before, with the date it was first saved and how many times it has been seen.
+- Saved CVs are deleted automatically {RETENTION_DAYS} days after they were last screened.
+  The employer can also delete the whole pool at any time from the Talent pool
+  panel in that view.
+- The pool belongs to the deployment, not to an individual employer account:
+  there are no user accounts in this app, so anyone using the Employer view of
+  the same deployment sees the same pool.
+
 ## Files and processing
 - Accepted formats for both CVs and job descriptions: {_FORMATS}. A job
   description can also be pasted straight into the text box.
@@ -85,8 +119,13 @@ with its own URL: Job Seeker (`?view=job-seeker`) and Employer (`?view=employer`
 - Uploaded files are processed in memory and sent to Google's Gemini API to be
   analysed, so the content does leave the server and is handled under Google's
   API terms.
-- Nothing about an uploaded file is written to disk by this app. The only thing
-  saved is an anonymous counter of completed runs.
+- The original uploaded file is never written to disk.
+- There is one exception to storage, and it is opt-in: if an employer ticks the
+  talent pool box, the cleaned text of the CVs in that run is saved, with the
+  filename and the email found in the CV, until {RETENTION_DAYS} days after it was last
+  screened. Nothing a job seeker uploads in the Job Seeker view is ever saved.
+- Apart from that, the only thing stored is an anonymous counter of completed
+  runs.
 
 ## The counters in the header
 - "CVs analysed" counts CVs processed, "Roles matched" counts job descriptions
@@ -102,6 +141,10 @@ with its own URL: Job Seeker (`?view=job-seeker`) and Employer (`?view=employer`
   use it, but the free tier's per-minute limits apply. Screening a large batch of
   CVs may hit those limits, which the app reports per candidate rather than
   failing the whole run.
+- A single Job Seeker analysis makes several requests: cleaning the CV, scoring
+  it, the keyword and formatting check, the similar roles, and the improvement
+  plan when the score is below {STRONG_MATCH_THRESHOLD}%. Screening one uploaded CV costs two,
+  and each saved CV re-scored from the talent pool costs one more.
 """
 
 ASSISTANT_SYSTEM_PROMPT = f"""\

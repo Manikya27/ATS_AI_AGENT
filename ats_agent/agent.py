@@ -10,8 +10,9 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import errors, types
 
-from .models import ImprovementPlan, JobSuggestions, MatchResult
+from .models import CVReview, ImprovementPlan, JobSuggestions, MatchResult
 from .prompts import (
+    CV_REVIEW_SYSTEM_PROMPT,
     CV_TO_MARKDOWN_SYSTEM_PROMPT,
     IMPROVEMENT_PLAN_SYSTEM_PROMPT,
     JOB_SUGGESTIONS_SYSTEM_PROMPT,
@@ -89,6 +90,24 @@ class ATSAgent:
         plan = self._generate(IMPROVEMENT_PLAN_SYSTEM_PROMPT, user_prompt, ImprovementPlan)
         plan.target_match_percentage = STRONG_MATCH_THRESHOLD
         return plan
+
+    def review_cv(self, resume_text: str, job_description: str) -> CVReview:
+        """Keyword coverage and formatting advice for this CV against this role.
+
+        Complements `analyze`, which judges capability. This judges the document:
+        which of the role's own words the CV never says, and how it is laid out.
+        A candidate can be qualified and still be filtered out for wording the
+        same experience differently, which is the cheapest failure to fix.
+        """
+        resume_text, job_description = self._prepare_documents(resume_text, job_description)
+
+        user_prompt = (
+            f"JOB DESCRIPTION:\n{job_description}\n\n"
+            f"CANDIDATE CV:\n{resume_text}\n\n"
+            "Which of this role's own terms does the CV not say, and how should the CV be "
+            "structured for this application?"
+        )
+        return self._generate(CV_REVIEW_SYSTEM_PROMPT, user_prompt, CVReview)
 
     def suggest_jobs(
         self, resume_text: str, job_description: str | None = None
