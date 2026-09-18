@@ -6,10 +6,10 @@ from pathlib import Path
 import streamlit as st
 
 from ats_agent.agent import IMPROVEMENT_TARGET_PERCENTAGE, LOW_MATCH_THRESHOLD
+from ats_agent.knowledge import MAX_CANDIDATES
 from ats_agent.scheduling import MEETING_ELIGIBLE_THRESHOLD
 from ats_agent.stats import UsageStats
-from views.employer import MAX_CANDIDATES
-from views.router import EMPLOYER, JOB_SEEKER, href
+from views.router import ASSISTANT, EMPLOYER, JOB_SEEKER, href
 from views.theme import render_stat_tiles
 
 DEMO_GIF = Path(__file__).resolve().parent.parent / "docs" / "demo.gif"
@@ -177,6 +177,13 @@ def render(stats: UsageStats) -> None:
     for question, answer in _FAQ:
         with st.expander(question):
             st.write(answer)
+
+    st.markdown(
+        '<p class="e360-section-sub" style="margin-top:1.1rem">Something else on your mind? '
+        f'<a href="{href(ASSISTANT)}" target="_self" class="e360-inline-link">Ask the assistant</a> '
+        "- it answers questions about how the product works.</p>",
+        unsafe_allow_html=True,
+    )
 
     # --- Footer -------------------------------------------------------
     st.markdown(

@@ -11,11 +11,12 @@ import streamlit as st
 HOME = "home"
 JOB_SEEKER = "job-seeker"
 EMPLOYER = "employer"
+ASSISTANT = "assistant"
 
-VIEWS = (HOME, JOB_SEEKER, EMPLOYER)
+VIEWS = (HOME, JOB_SEEKER, EMPLOYER, ASSISTANT)
 
 # Labels used by the nav bar and the landing page's cards.
-VIEW_LABELS = {JOB_SEEKER: "Job Seeker", EMPLOYER: "Employer"}
+VIEW_LABELS = {JOB_SEEKER: "Job Seeker", EMPLOYER: "Employer", ASSISTANT: "Assistant"}
 
 
 def current_view() -> str:

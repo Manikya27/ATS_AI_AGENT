@@ -393,6 +393,12 @@ _CSS = f"""
     border-top: 1px solid {BORDER};
     margin: 3rem 0 2rem;
   }}
+  .e360-inline-link {{
+    color: {ORANGE} !important;
+    font-weight: 600;
+    text-decoration: none !important;
+    border-bottom: 1px solid rgba(255, 122, 31, 0.4);
+  }}
   .e360-footer {{
     color: #6C6C74;
     font-size: 0.8rem;
@@ -463,12 +469,16 @@ def render_stat_tiles(stats: UsageStats, note: str | None = None) -> None:
 
 def render_navbar(active: str) -> None:
     """Brand + view switcher shown on the inner pages."""
-    from views.router import EMPLOYER, JOB_SEEKER, href
+    from views.router import ASSISTANT, EMPLOYER, JOB_SEEKER, href
 
     links = "".join(
         f'<a href="{href(view)}" target="_self" '
         f'class="{"active" if view == active else ""}">{html.escape(label)}</a>'
-        for view, label in ((JOB_SEEKER, "Job Seeker"), (EMPLOYER, "Employer"))
+        for view, label in (
+            (JOB_SEEKER, "Job Seeker"),
+            (EMPLOYER, "Employer"),
+            (ASSISTANT, "Assistant"),
+        )
     )
     st.markdown(
         '<div class="e360-nav">'

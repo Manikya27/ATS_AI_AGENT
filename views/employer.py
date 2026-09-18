@@ -8,13 +8,12 @@ import pandas as pd
 import streamlit as st
 
 from ats_agent import ATSAgent, ATSAgentError
+from ats_agent.knowledge import MAX_CANDIDATES
 from ats_agent.models import MatchResult
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
 from ats_agent.scheduling import MEETING_ELIGIBLE_THRESHOLD, extract_email, google_calendar_meeting_link
 from views.common import COLOR_MATCHED, record_usage, render_result, require_api_key
 from views.theme import ACCENT_POSITIVE, section_label, step_label, view_header
-
-MAX_CANDIDATES = 20
 
 
 @dataclass

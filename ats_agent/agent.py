@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping, Sequence
 from typing import TypeVar
 
 from pydantic import BaseModel
@@ -102,6 +103,35 @@ class ATSAgent:
         )
         return self._generate(JOB_SUGGESTIONS_SYSTEM_PROMPT, user_prompt, JobSuggestions)
 
+    def answer_question(self, question: str, history: Sequence[Mapping[str, str]] = ()) -> str:
+        """Answer a visitor's question about the product, grounded in the reference.
+
+        `history` is the prior conversation as {"role": "user"|"assistant",
+        "content": str}, oldest first, excluding the question being asked.
+        """
+        # Imported here rather than at module scope: knowledge.py reads this
+        # module's threshold constants, so a top-level import would be circular.
+        from .knowledge import ASSISTANT_SYSTEM_PROMPT, MAX_HISTORY_TURNS
+
+        question = question.strip()
+        if not question:
+            raise ATSAgentError("Please enter a question.")
+
+        contents = [
+            {
+                "role": "model" if turn["role"] == "assistant" else "user",
+                "parts": [{"text": turn["content"]}],
+            }
+            for turn in list(history)[-MAX_HISTORY_TURNS:]
+        ]
+        contents.append({"role": "user", "parts": [{"text": question[:4000]}]})
+
+        response = self._call(ASSISTANT_SYSTEM_PROMPT, contents)
+        text = (response.text or "").strip()
+        if not text:
+            raise ATSAgentError("The assistant didn't return an answer. Please try again.")
+        return text
+
     def _prepare_documents(self, resume_text: str, job_description: str) -> tuple[str, str]:
         resume_text = resume_text.strip()
         job_description = job_description.strip()
@@ -113,7 +143,8 @@ class ATSAgent:
 
         return resume_text[:MAX_DOCUMENT_CHARS], job_description[:MAX_DOCUMENT_CHARS]
 
-    def _call(self, system_prompt: str, user_prompt: str, *, schema: type[BaseModel] | None = None):
+    def _call(self, system_prompt: str, contents, *, schema: type[BaseModel] | None = None):
+        """`contents` is a prompt string, or a list of turns for a conversation."""
         config_kwargs: dict = {"system_instruction": system_prompt}
         if schema is not None:
             config_kwargs["response_mime_type"] = "application/json"
@@ -122,7 +153,7 @@ class ATSAgent:
         try:
             return self.client.models.generate_content(
                 model=self.model,
-                contents=user_prompt,
+                contents=contents,
                 config=types.GenerateContentConfig(**config_kwargs),
             )
         except errors.ClientError as e:

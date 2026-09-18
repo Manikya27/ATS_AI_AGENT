@@ -13,6 +13,8 @@ the browser's back button works.
 - **Employer** - paste a job description once, upload multiple candidate CVs, and get a ranked
   shortlist by match percentage. Candidates at 75% or above get a one-click "Schedule Google
   Meet interview" action, pre-filled with the candidate's email (extracted from their CV).
+- **Assistant** - a chat that answers questions about how the product works, grounded in a
+  product reference rather than the model's own guesses.
 
 Both views share the same core agent, packaged as a small, reusable product
 ([`ats_agent`](./ats_agent), `ATSAgent`) rather than a one-off script.
@@ -39,6 +41,9 @@ schedules an interview with the top candidate. Higher-quality version:
 - Landing page with the product overview, how-it-works, an embedded demo and an FAQ, plus
   two cards for choosing a view - the whole card is the link
 - URL-routed views with a persistent nav bar; back/forward and shareable links both work
+- In-app assistant: a conversational view for questions about the product, answering only
+  from a curated reference whose numbers are interpolated from the app's own constants, so
+  it can't drift out of date or invent features
 - Premium black-and-orange dark theme, set via `.streamlit/config.toml` plus a small
   brand stylesheet (`views/theme.py`) - simple system sans throughout
 - Live usage stats in the header (CVs analysed, roles matched, sessions helped)
@@ -76,7 +81,8 @@ app.py                    Entry point: routes ?view= to the landing page or a vi
 .streamlit/config.toml    Black/orange theme (colours, fonts, radii, chart palette)
 views/
   landing.py               Landing page: overview, view chooser, demo, FAQ
-  router.py                 Query-param routing (one URL per view)
+  assistant.py              Assistant view - grounded chat about the product
+  router.py                  Query-param routing (one URL per view)
   theme.py                   Brand chrome: stylesheet, nav bar, stat tiles
   job_seeker.py             Job Seeker view - single CV vs. one job description
   employer.py                Employer view - bulk CV screening + ranked shortlist
@@ -87,6 +93,7 @@ ats_agent/
   models.py                   Pydantic schemas: MatchResult, ImprovementPlan, JobSuggestions
   parsers.py                   PDF/DOCX/TXT text extraction
   prompts.py                   System prompts for each agent capability (tone included)
+  knowledge.py                  Product reference + rules behind the in-app assistant
   scheduling.py                 CV email extraction + Google Calendar meeting link builder
   stats.py                       Persistent usage counters behind the header stats
 Dockerfile                 Container image for hosting the app as a service
@@ -115,8 +122,17 @@ streamlit run app.py
 ```
 
 Then open the local URL Streamlit prints (usually http://localhost:8501). You'll land on the
-overview page; pick a view from there, or go straight to one with `?view=job-seeker` /
-`?view=employer`.
+overview page; pick a view from there, or go straight to one with `?view=job-seeker`,
+`?view=employer` or `?view=assistant`.
+
+### The assistant
+
+`?view=assistant` is a chat for questions about the product. It answers only from the
+reference in `ats_agent/knowledge.py`, which interpolates the app's real constants (score
+thresholds, the CV-per-run limit, accepted formats, meeting length), so the numbers it quotes
+are the ones the code enforces. It is told to say it doesn't know rather than invent an answer,
+never to disclose the model or any server configuration, and it cannot see anyone's CV or
+results - those live in the view that produced them, which is a separate session.
 
 ## Configuration
 
