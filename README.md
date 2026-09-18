@@ -18,6 +18,19 @@ Both views share the same core agent, packaged as a small, reusable product
 The API key and model are **server-side configuration only** - visitors never see or enter
 either; there's no key input and no model name anywhere in the UI.
 
+## Demo
+
+![Employee 360 walkthrough](docs/demo.gif)
+
+A job seeker checks their CV against a role and gets a score, a skill breakdown, an
+improvement plan and course suggestions; an employer then bulk-screens three CVs into a
+ranked shortlist and schedules an interview with the top candidate. Higher-quality version:
+[`docs/demo.mp4`](docs/demo.mp4).
+
+> Recorded with sample CVs. The analysis text in the recording comes from a stubbed model so
+> the walkthrough is reproducible without an API key - the interface, charts and usage
+> counters are the real app.
+
 ## Features
 
 - Premium black-and-orange dark theme, set via `.streamlit/config.toml` plus a small
