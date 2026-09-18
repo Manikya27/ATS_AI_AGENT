@@ -134,10 +134,11 @@ def render_improvement_plan(plan: ImprovementPlan) -> None:
 
 
 def render_job_suggestions(jobs: JobSuggestions) -> None:
-    st.markdown("#### Roles that might fit your CV better")
+    st.markdown("#### Similar roles worth searching for")
     st.caption(
-        "AI-generated suggestions based on your CV's skills and experience - not live job "
-        "market listings."
+        "Roles of the same kind your CV already supports, so you can widen the search around "
+        "this application. These are AI-generated suggestions from your CV - not live "
+        "vacancies, and no company here is known to be hiring."
     )
     if not jobs.suggestions:
         st.caption("No suggestions.")

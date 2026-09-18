@@ -25,11 +25,10 @@ DEFAULT_MODEL = os.environ.get("ATS_AGENT_MODEL", "gemini-2.5-flash")
 # per-request quota predictable.
 MAX_DOCUMENT_CHARS = 60_000
 
-# A CV/JD match below this score is considered a weak fit for this specific role.
-LOW_MATCH_THRESHOLD = 50
-
-# The score the improvement plan's guidance is aimed at reaching.
-IMPROVEMENT_TARGET_PERCENTAGE = 75
+# The bar for a strong match. Below it the Job Seeker view offers an
+# improvement plan aimed at reaching it; at or above it the Employer view
+# offers to schedule an interview. One number, one meaning, used throughout.
+STRONG_MATCH_THRESHOLD = 75
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
@@ -75,7 +74,7 @@ class ATSAgent:
     def suggest_improvement_plan(
         self, resume_text: str, job_description: str, current_result: MatchResult
     ) -> ImprovementPlan:
-        """Guidance for closing the gap on a low-scoring CV/JD match."""
+        """Guidance for reaching a strong match, for a CV that isn't there yet."""
         resume_text, job_description = self._prepare_documents(resume_text, job_description)
 
         user_prompt = (
@@ -84,23 +83,39 @@ class ATSAgent:
             f"Current match score: {current_result.match_percentage}% ({current_result.verdict})\n"
             f"Missing skills already identified: {', '.join(current_result.missing_skills) or 'none listed'}\n"
             f"Gaps already identified: {', '.join(current_result.gaps) or 'none listed'}\n\n"
-            f"Give the candidate a plan to raise their match toward "
-            f"{IMPROVEMENT_TARGET_PERCENTAGE}%."
+            f"Give the candidate a plan to raise their match to "
+            f"{STRONG_MATCH_THRESHOLD}% or better."
         )
         plan = self._generate(IMPROVEMENT_PLAN_SYSTEM_PROMPT, user_prompt, ImprovementPlan)
-        plan.target_match_percentage = IMPROVEMENT_TARGET_PERCENTAGE
+        plan.target_match_percentage = STRONG_MATCH_THRESHOLD
         return plan
 
-    def suggest_jobs(self, resume_text: str) -> JobSuggestions:
-        """AI-suggested job titles/roles that fit the CV, independent of any specific JD."""
+    def suggest_jobs(
+        self, resume_text: str, job_description: str | None = None
+    ) -> JobSuggestions:
+        """Roles the CV already supports.
+
+        Given the job description the candidate is targeting, these are roles of
+        the same kind they are qualified for today - the adjacent openings worth
+        searching for. Without one, they are simply the best fits for the CV.
+
+        These are AI-generated role suggestions, not live vacancies: the agent
+        has no job-board access and never claims a named company is hiring.
+        """
         resume_text = resume_text.strip()[:MAX_DOCUMENT_CHARS]
         if not resume_text:
             raise ATSAgentError("The CV appears to be empty or unreadable.")
 
-        user_prompt = (
-            f"CANDIDATE CV:\n{resume_text}\n\n"
-            "Suggest job titles/roles this candidate is well-qualified for right now."
-        )
+        user_prompt = f"CANDIDATE CV:\n{resume_text}\n\n"
+        if job_description and job_description.strip():
+            user_prompt += (
+                "ROLE THEY ARE TARGETING:\n"
+                f"{job_description.strip()[:MAX_DOCUMENT_CHARS]}\n\n"
+                "Suggest roles of this kind that their CV already supports, so they know "
+                "what else to search for alongside this application."
+            )
+        else:
+            user_prompt += "Suggest job titles/roles this candidate is well-qualified for right now."
         return self._generate(JOB_SUGGESTIONS_SYSTEM_PROMPT, user_prompt, JobSuggestions)
 
     def answer_question(self, question: str, history: Sequence[Mapping[str, str]] = ()) -> str:

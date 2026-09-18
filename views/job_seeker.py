@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ats_agent import ATSAgent, ATSAgentError, LOW_MATCH_THRESHOLD
+from ats_agent import ATSAgent, ATSAgentError, STRONG_MATCH_THRESHOLD
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
 from views.common import (
     record_usage,
@@ -90,7 +90,9 @@ def render() -> None:
         st.session_state["js_last_improvement_plan"] = None
         st.session_state["js_last_job_suggestions"] = None
 
-        if result.match_percentage < LOW_MATCH_THRESHOLD:
+        # Anything short of a strong match gets the plan: the gap is worth closing
+        # whether it is a couple of points or a career step.
+        if result.match_percentage < STRONG_MATCH_THRESHOLD:
             with st.spinner("Working out how to close the gap..."):
                 try:
                     st.session_state["js_last_improvement_plan"] = agent.suggest_improvement_plan(
@@ -99,11 +101,15 @@ def render() -> None:
                 except ATSAgentError as e:
                     st.warning(f"Couldn't generate an improvement plan: {e}")
 
-            with st.spinner("Looking for roles that fit your CV..."):
-                try:
-                    st.session_state["js_last_job_suggestions"] = agent.suggest_jobs(resume_md)
-                except ATSAgentError as e:
-                    st.warning(f"Couldn't generate job suggestions: {e}")
+        # Similar roles are useful at any score - a strong match still wants other
+        # openings of the same kind to apply to.
+        with st.spinner("Finding similar roles your CV already fits..."):
+            try:
+                st.session_state["js_last_job_suggestions"] = agent.suggest_jobs(
+                    resume_md, job_description
+                )
+            except ATSAgentError as e:
+                st.warning(f"Couldn't suggest similar roles: {e}")
 
         record_usage(cvs=1)
 
