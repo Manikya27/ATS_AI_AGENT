@@ -36,9 +36,9 @@ def record_usage(cvs: int) -> None:
     """Record a completed run, then rerun so the header stats show it immediately."""
     if cvs <= 0:
         return
-    new_person = not st.session_state.get("counted_person", False)
-    st.session_state["counted_person"] = True
-    st.session_state["usage_stats"] = record_run(cvs=cvs, new_person=new_person)
+    new_session = not st.session_state.get("counted_session", False)
+    st.session_state["counted_session"] = True
+    st.session_state["usage_stats"] = record_run(cvs=cvs, new_session=new_session)
     st.rerun()
 
 

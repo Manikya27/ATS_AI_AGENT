@@ -197,13 +197,221 @@ _CSS = f"""
   }}
   [data-testid="stProgressbar"] > div > div > div {{ background: {ORANGE}; }}
   hr, [data-testid="stDivider"] hr {{ border-color: {BORDER}; }}
+
+  /* ---- Nav bar (inner pages) --------------------------------------- */
+  .e360-nav {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.9rem;
+    margin-bottom: 1.4rem;
+    border-bottom: 1px solid {BORDER};
+  }}
+  .e360-nav-brand {{
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: {TEXT} !important;
+    text-decoration: none !important;
+  }}
+  .e360-nav-brand b {{ color: {ORANGE}; font-weight: 700; }}
+  .e360-mark-sm {{
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: linear-gradient(145deg, {ORANGE} 0%, {ORANGE_DIM} 100%);
+    color: {INK};
+    font-size: 0.56rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }}
+  .e360-nav-links {{ display: flex; gap: 0.35rem; }}
+  .e360-nav-links a {{
+    padding: 0.4rem 0.85rem;
+    border-radius: 0.4rem;
+    border: 1px solid transparent;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: {MUTED} !important;
+    text-decoration: none !important;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }}
+  .e360-nav-links a:hover {{ color: {TEXT} !important; background: {SURFACE}; }}
+  .e360-nav-links a.active {{
+    color: {ORANGE} !important;
+    border-color: rgba(255, 122, 31, 0.35);
+    background: rgba(255, 122, 31, 0.08);
+  }}
+
+  /* ---- Landing: hero ----------------------------------------------- */
+  .e360-eyebrow {{
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: {ORANGE};
+    margin-bottom: 0.9rem;
+  }}
+  .e360-h1 {{
+    font-size: 3.1rem;
+    line-height: 1.06;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    color: {TEXT};
+    margin: 0 0 1rem 0;
+    max-width: 17ch;
+  }}
+  .e360-h1 em {{
+    font-style: normal;
+    background: linear-gradient(100deg, {ORANGE} 10%, #FFB27A 90%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }}
+  .e360-lede {{
+    font-size: 1.08rem;
+    line-height: 1.6;
+    color: #B6B6BD;
+    max-width: 56ch;
+    margin: 0 0 2rem 0;
+  }}
+
+  /* ---- Landing: choice cards --------------------------------------- */
+  .e360-choice {{
+    display: block;
+    height: 100%;
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 0.9rem;
+    padding: 1.6rem 1.6rem 1.4rem;
+    text-decoration: none !important;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  }}
+  .e360-choice:hover {{
+    transform: translateY(-3px);
+    border-color: rgba(255, 122, 31, 0.55);
+    background: #191919;
+  }}
+  .e360-choice-kicker {{
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: {ORANGE};
+    margin-bottom: 0.6rem;
+  }}
+  .e360-choice-title {{
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: {TEXT};
+    margin-bottom: 1rem;
+  }}
+  .e360-choice-point {{
+    display: block;
+    position: relative;
+    padding-left: 1.1rem;
+    color: #ABABB3;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    margin-bottom: 0.55rem;
+  }}
+  .e360-choice-point::before {{
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: {ORANGE};
+    opacity: 0.85;
+  }}
+  .e360-choice-cta {{
+    display: block;
+    margin-top: 1.3rem;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: {ORANGE};
+  }}
+  .e360-choice:hover .e360-choice-cta span {{ transform: translateX(3px); }}
+  .e360-choice-cta span {{ transition: transform 0.18s ease; display: inline-block; }}
+
+  /* ---- Landing: steps & features ----------------------------------- */
+  .e360-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.9rem;
+  }}
+  .e360-step-card, .e360-feature {{
+    background: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 0.7rem;
+    padding: 1.15rem 1.25rem;
+  }}
+  .e360-step-num {{
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: {ORANGE};
+    margin-bottom: 0.5rem;
+  }}
+  .e360-card-title {{
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: {TEXT};
+    margin-bottom: 0.35rem;
+  }}
+  .e360-card-body {{ font-size: 0.88rem; line-height: 1.5; color: #9E9EA6; }}
+
+  .e360-section-title {{
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: {TEXT};
+    margin: 0 0 0.35rem 0;
+  }}
+  .e360-section-sub {{
+    color: {MUTED};
+    font-size: 0.93rem;
+    margin: 0 0 1.2rem 0;
+    max-width: 60ch;
+  }}
+  .e360-rule {{
+    border: 0;
+    border-top: 1px solid {BORDER};
+    margin: 3rem 0 2rem;
+  }}
+  .e360-footer {{
+    color: #6C6C74;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    margin-top: 2.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid {BORDER};
+  }}
+  [data-testid="stImage"] img {{
+    border-radius: 0.7rem;
+    border: 1px solid {BORDER};
+  }}
 </style>
 """
 
 _TILES = (
-    ("people_helped", "People helped"),
     ("cvs_analyzed", "CVs analysed"),
     ("roles_matched", "Roles matched"),
+    ("sessions_helped", "Sessions helped"),
 )
 
 # Accents for section labels. Text always carries the meaning; colour is
@@ -238,17 +446,7 @@ def section_label(text: str, accent: str = MUTED) -> None:
     )
 
 
-def render_header(stats: UsageStats) -> None:
-    st.markdown(
-        '<div class="e360-hero">'
-        '<div class="e360-mark">E360</div>'
-        '<div class="e360-wordmark">Employee<span>360</span></div>'
-        "</div>"
-        '<p class="e360-tagline">Precision CV and job-description matching, '
-        "for candidates and hiring teams.</p>",
-        unsafe_allow_html=True,
-    )
-
+def render_stat_tiles(stats: UsageStats, note: str | None = None) -> None:
     tiles = "".join(
         '<div class="e360-stat">'
         f'<div class="e360-stat-value">{format_count(getattr(stats, field))}</div>'
@@ -257,8 +455,28 @@ def render_header(stats: UsageStats) -> None:
         for field, label in _TILES
     )
     st.markdown(f'<div class="e360-stats">{tiles}</div>', unsafe_allow_html=True)
+    if note:
+        st.markdown(
+            f'<p class="e360-stats-note">{html.escape(note)}</p>', unsafe_allow_html=True
+        )
+
+
+def render_navbar(active: str) -> None:
+    """Brand + view switcher shown on the inner pages."""
+    from views.router import EMPLOYER, JOB_SEEKER, href
+
+    links = "".join(
+        f'<a href="{href(view)}" target="_self" '
+        f'class="{"active" if view == active else ""}">{html.escape(label)}</a>'
+        for view, label in ((JOB_SEEKER, "Job Seeker"), (EMPLOYER, "Employer"))
+    )
     st.markdown(
-        '<p class="e360-stats-note">Live counts from completed runs on this '
-        "deployment.</p>",
+        '<div class="e360-nav">'
+        f'<a class="e360-nav-brand" href="{href("home")}" target="_self">'
+        '<span class="e360-mark-sm">E360</span>'
+        "<span>Employee<b>360</b></span>"
+        "</a>"
+        f'<div class="e360-nav-links">{links}</div>'
+        "</div>",
         unsafe_allow_html=True,
     )
