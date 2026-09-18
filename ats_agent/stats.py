@@ -21,9 +21,14 @@ _LOCK = threading.Lock()
 
 @dataclass(frozen=True)
 class UsageStats:
-    """Counters shown in the header."""
+    """Counters shown in the header.
 
-    people_helped: int = 0
+    `sessions_helped` counts visits that completed at least one run, not unique
+    humans: navigating between views is a full page load and therefore a new
+    session, and nothing stable identifies a browser across loads.
+    """
+
+    sessions_helped: int = 0
     cvs_analyzed: int = 0
     roles_matched: int = 0
 
@@ -38,12 +43,12 @@ def load_stats() -> UsageStats:
     return UsageStats(**{k: int(v) for k, v in raw.items() if k in fields})
 
 
-def record_run(*, cvs: int, new_person: bool) -> UsageStats:
+def record_run(*, cvs: int, new_session: bool) -> UsageStats:
     """Record one successful run: `cvs` CVs analysed against one role."""
     with _LOCK:
         current = load_stats()
         updated = UsageStats(
-            people_helped=current.people_helped + (1 if new_person else 0),
+            sessions_helped=current.sessions_helped + (1 if new_session else 0),
             cvs_analyzed=current.cvs_analyzed + cvs,
             roles_matched=current.roles_matched + 1,
         )
