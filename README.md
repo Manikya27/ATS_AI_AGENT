@@ -1,7 +1,9 @@
 # Employee 360
 
-An AI agent that acts as an ATS (Applicant Tracking System), served as a two-view web app.
-Job Seeker and Employer are selected via tabs at the top of the page:
+An AI agent that acts as an ATS (Applicant Tracking System), served as a small website: a
+landing page explains the product, and visitors choose which of the two views to enter. Each
+view has its own URL (`/`, `?view=job-seeker`, `?view=employer`), so links are shareable and
+the browser's back button works.
 
 - **Job Seeker** - upload your CV and a job description, get a match score, missing skills,
   and concrete edits to improve your chances, delivered in a professional, encouraging tone.
@@ -22,9 +24,10 @@ either; there's no key input and no model name anywhere in the UI.
 
 ![Employee 360 walkthrough](docs/demo.gif)
 
-A job seeker checks their CV against a role and gets a score, a skill breakdown, an
-improvement plan and course suggestions; an employer then bulk-screens three CVs into a
-ranked shortlist and schedules an interview with the top candidate. Higher-quality version:
+Starting from the landing page: a job seeker picks their view, checks a CV against a role
+and gets a score, a skill breakdown, an improvement plan and course suggestions; then the nav
+bar switches to the employer view, which bulk-screens three CVs into a ranked shortlist and
+schedules an interview with the top candidate. Higher-quality version:
 [`docs/demo.mp4`](docs/demo.mp4).
 
 > Recorded with sample CVs. The analysis text in the recording comes from a stubbed model so
@@ -33,10 +36,12 @@ ranked shortlist and schedules an interview with the top candidate. Higher-quali
 
 ## Features
 
+- Landing page with the product overview, how-it-works, an embedded demo and an FAQ, plus
+  two cards for choosing a view - the whole card is the link
+- URL-routed views with a persistent nav bar; back/forward and shareable links both work
 - Premium black-and-orange dark theme, set via `.streamlit/config.toml` plus a small
   brand stylesheet (`views/theme.py`) - simple system sans throughout
-- Live usage stats in the header (people helped, CVs analysed, roles matched)
-- Job Seeker / Employer views, selected via tabs at the top of the page (no sidebar)
+- Live usage stats in the header (CVs analysed, roles matched, sessions helped)
 - Upload CVs and job descriptions as PDF, DOCX, or TXT
 - Every CV is first converted to clean, structured Markdown by the model, and that version is
   reused across every subsequent call for the same CV - cuts noise from PDF/DOCX extraction
@@ -67,10 +72,12 @@ ranked shortlist and schedules an interview with the top candidate. Higher-quali
 ## Project structure
 
 ```
-app.py                    Entry point: title + Job Seeker/Employer tabs
+app.py                    Entry point: routes ?view= to the landing page or a view
 .streamlit/config.toml    Black/orange theme (colours, fonts, radii, chart palette)
 views/
-  theme.py                 Brand chrome: stylesheet, hero header, stat tiles
+  landing.py               Landing page: overview, view chooser, demo, FAQ
+  router.py                 Query-param routing (one URL per view)
+  theme.py                   Brand chrome: stylesheet, nav bar, stat tiles
   job_seeker.py             Job Seeker view - single CV vs. one job description
   employer.py                Employer view - bulk CV screening + ranked shortlist
   common.py                   Shared UI helpers (API key lookup, result rendering, counters)
@@ -107,8 +114,9 @@ export GEMINI_API_KEY=your-gemini-api-key
 streamlit run app.py
 ```
 
-Then open the local URL Streamlit prints (usually http://localhost:8501). Use the tabs at the
-top of the page to switch between the Job Seeker and Employer views.
+Then open the local URL Streamlit prints (usually http://localhost:8501). You'll land on the
+overview page; pick a view from there, or go straight to one with `?view=job-seeker` /
+`?view=employer`.
 
 ## Configuration
 
@@ -122,8 +130,13 @@ top of the page to switch between the Job Seeker and Employer views.
 
 The three figures in the header are **real counters**, incremented only when a run actually
 succeeds - they start at zero on a fresh deployment and are not seeded with a marketing
-number. `people_helped` counts browser sessions that completed at least one run, `cvs_analyzed`
-counts CVs processed, and `roles_matched` counts job descriptions matched against.
+number. `cvs_analyzed` counts CVs processed, `roles_matched` counts job descriptions matched
+against, and `sessions_helped` counts visits that completed at least one run.
+
+`sessions_helped` deliberately says *sessions*, not people: moving between views is a full
+page load and therefore a new Streamlit session, and nothing stable identifies a browser
+across loads, so one person who uses both views counts twice. Counting sessions is the
+honest description of what the number actually measures.
 
 They live in a JSON file at `ATS_STATS_PATH`. Container filesystems are ephemeral, so **mount a
 volume at that path** (or point it at one) if you want the counts to survive a redeploy.
