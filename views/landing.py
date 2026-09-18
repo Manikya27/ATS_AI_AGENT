@@ -8,6 +8,7 @@ import streamlit as st
 from ats_agent.agent import STRONG_MATCH_THRESHOLD
 from ats_agent.knowledge import MAX_CANDIDATES
 from ats_agent.scheduling import MEETING_ELIGIBLE_THRESHOLD
+from ats_agent.talent_pool import RETENTION_DAYS as TALENT_POOL_RETENTION_DAYS
 from ats_agent.stats import UsageStats
 from views.router import ASSISTANT, EMPLOYER, JOB_SEEKER, href
 from views.theme import render_stat_tiles
@@ -21,9 +22,12 @@ _CHOICES = (
         "title": "Check your CV against a role",
         "points": [
             "A match score with the skills you hit and the ones you miss",
-            "Honest, encouraging feedback - never a blunt rejection",
+            "The exact words this role screens for that your CV never says",
+            "How to restructure the CV so it lands in an eight-second skim",
             f"Under {STRONG_MATCH_THRESHOLD}%? A plan to get there, plus courses to close "
             "the gap",
+            f"Over {STRONG_MATCH_THRESHOLD}%? The questions you're likely to be asked, and what "
+            "to bring to each",
             "Similar roles your CV already fits, to widen the search",
         ],
         "cta": "Check my CV",
@@ -36,6 +40,7 @@ _CHOICES = (
             f"Up to {MAX_CANDIDATES} CVs against one job description per run",
             "A ranked shortlist with a score chart",
             "Per-candidate strengths, gaps and matched skills",
+            f"Candidates you saved earlier who also clear {MEETING_ELIGIBLE_THRESHOLD}%, surfaced automatically",
             f"One-click Google Meet invite for {MEETING_ELIGIBLE_THRESHOLD}%+ matches",
         ],
         "cta": "Screen candidates",
@@ -45,13 +50,13 @@ _CHOICES = (
 _STEPS = (
     ("Step 01", "Upload", "Drop in a CV and the job description - PDF, DOCX or plain text."),
     ("Step 02", "Analyse", "Each CV is cleaned into structured Markdown, then scored against every requirement in the role."),
-    ("Step 03", "Act", "Fix the CV with a concrete plan, or shortlist the candidate and book the interview."),
+    ("Step 03", "Act", "Fix the CV with a concrete plan, prepare for the interview you're about to get, or shortlist the candidate and book one."),
 )
 
 _FEATURES = (
     ("Explainable scores", "Every score comes with the matched skills, the missing ones and the reasoning behind it."),
     ("Structured output", "Results are validated against typed schemas, so the UI never renders a half-parsed answer."),
-    ("Your CV isn't stored", "Files are processed in memory and sent to Google Gemini for analysis. Only anonymous run counts are saved."),
+    ("Nothing is kept unless asked", "Job seekers' CVs are processed in memory and never stored. An employer can opt in to a talent pool, which expires on its own."),
     ("Self-hostable", "One container, one API key. Runs on Gemini's free tier."),
 )
 
@@ -65,8 +70,26 @@ _FAQ = (
         "What happens to my CV?",
         "It's read in memory, converted to clean Markdown, and sent to Google Gemini to be "
         "analysed - so it does leave this server and is processed under Google's API terms. "
-        "Nothing about the file is written to disk here: the only thing saved is the anonymous "
-        "counter of how many runs have completed.",
+        "A CV you upload in the Job Seeker view is never written to disk here. The one "
+        "exception anywhere in the product is the Employer view's talent pool: an employer "
+        "can tick a box to save the CVs in a screening run so a later role can be matched "
+        "against them. That box is off by default, and saved CVs are deleted "
+        f"{TALENT_POOL_RETENTION_DAYS} days after they were last screened.",
+    ),
+    (
+        "What is the keyword check?",
+        "Keyword filters and skim-reading recruiters match on the words themselves, so a CV "
+        "can hold exactly the right experience under the wrong label and never get read. The "
+        "Job Seeker view lists the terms the job description screens on and marks each one "
+        "present, worded differently, or missing. Only add the ones your experience genuinely "
+        "supports - stuffing a CV with terms you can't discuss costs you the interview.",
+    ),
+    (
+        "Are the interview questions the real ones?",
+        "No - and nothing here has seen an employer's actual interview. They are predicted "
+        "from the job description and your CV: what the role is built around, what on your CV "
+        "an interviewer will want to open up, and where the two don't quite line up. Each one "
+        "says why it's expected, so you can judge the reasoning rather than trust the list.",
     ),
     (
         "How accurate is the score?",

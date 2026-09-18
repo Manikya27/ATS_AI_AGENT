@@ -1,5 +1,7 @@
-"""Structured output schema for the ATS matching result."""
+"""Structured output schemas for the ATS matching result."""
 from __future__ import annotations
+
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -83,3 +85,140 @@ class JobSuggestion(BaseModel):
 
 class JobSuggestions(BaseModel):
     suggestions: list[JobSuggestion] = Field(default_factory=list)
+
+
+class KeywordHit(BaseModel):
+    """One term the job description leans on, and whether the CV actually says it.
+
+    Distinct from `MatchResult.missing_skills`, which is a judgment about
+    capability. This is about literal vocabulary: keyword screens and recruiters
+    skimming for terms match on the words themselves, so a candidate can have
+    the skill and still fail the screen for never naming it.
+    """
+
+    keyword: str = Field(
+        ..., description="The term as the job description words it, e.g. 'Kubernetes', 'stakeholder management'"
+    )
+    status: Literal["present", "partial", "missing"] = Field(
+        ...,
+        description=(
+            "present: the CV uses this term (or an unmistakable equivalent). "
+            "partial: the CV shows the underlying experience but never names it this way, "
+            "or names it only in passing. "
+            "missing: the term and the experience behind it are both absent."
+        ),
+    )
+    importance: Literal["core", "preferred"] = Field(
+        ...,
+        description=(
+            "core: the JD lists it as required/must-have. preferred: nice-to-have, "
+            "bonus, or mentioned once in passing."
+        ),
+    )
+    advice: str = Field(
+        ...,
+        description=(
+            "One sentence. For present: where it already appears. For partial: which "
+            "existing bullet to reword so the term appears. For missing: whether it can "
+            "be added truthfully from real experience, or has to be built first."
+        ),
+    )
+
+
+class FormatTip(BaseModel):
+    """One concrete change to how the CV is laid out or written."""
+
+    area: str = Field(
+        ..., description="What part of the CV this concerns, e.g. 'Section order', 'Bullet phrasing', 'Contact block'"
+    )
+    issue: str = Field(..., description="What this CV does today - specific to the document supplied")
+    fix: str = Field(..., description="The concrete change to make, in one or two sentences")
+    impact: Literal["high", "medium", "low"] = Field(
+        ..., description="How much this change is worth relative to the others"
+    )
+
+
+class CVReview(BaseModel):
+    """Keyword coverage and formatting advice for one CV against one role."""
+
+    keyword_summary: str = Field(
+        ..., description="2-3 sentences on how well this CV's vocabulary lines up with the role's"
+    )
+    keywords: list[KeywordHit] = Field(
+        default_factory=list, description="The terms this role screens on, present and missing alike"
+    )
+    format_summary: str = Field(
+        ..., description="2-3 sentences on how this CV reads and parses today"
+    )
+    suggested_structure: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The section order that would serve this candidate best for this role, "
+            "top to bottom, each with a few words on what belongs in it"
+        ),
+    )
+    format_tips: list[FormatTip] = Field(
+        default_factory=list, description="Specific layout and phrasing changes, highest impact first"
+    )
+
+
+class InterviewQuestion(BaseModel):
+    """A question this pairing of CV and job description is likely to produce."""
+
+    question: str = Field(..., description="The question as an interviewer would actually phrase it")
+    category: Literal["technical", "experience", "behavioural", "gap", "motivation"] = Field(
+        ...,
+        description=(
+            "technical: a skill or tool the role names. experience: something specific on the "
+            "CV. behavioural: how they work with others or under pressure. gap: a weak spot, "
+            "missing requirement or oddity in the CV an interviewer will probe. motivation: "
+            "why this role, this company, this move."
+        ),
+    )
+    likelihood: Literal["very likely", "likely", "possible"] = Field(
+        ...,
+        description=(
+            "How reliably this comes up given how central it is to the job description. "
+            "Reserve 'very likely' for the handful the role is really built around."
+        ),
+    )
+    why_it_comes_up: str = Field(
+        ...,
+        description=(
+            "One sentence tying the question to a specific line of the job description or "
+            "the CV - so the candidate can see it is not generic"
+        ),
+    )
+    how_to_answer: str = Field(
+        ...,
+        description=(
+            "What a strong answer covers - the shape and the substance, not a script to "
+            "memorise or words to put in the candidate's mouth"
+        ),
+    )
+    draw_on: list[str] = Field(
+        default_factory=list,
+        description="Specific things already on this CV that make the best material for this answer",
+    )
+
+
+class InterviewPrep(BaseModel):
+    """Preparation for a candidate whose CV already clears the bar for this role."""
+
+    readiness_summary: str = Field(
+        ...,
+        description=(
+            "2-3 sentences: what this CV makes the interview about, and the one or two "
+            "things most worth rehearsing before walking in"
+        ),
+    )
+    questions: list[InterviewQuestion] = Field(
+        default_factory=list, description="The questions to prepare, most likely first"
+    )
+    questions_to_ask: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Questions the candidate could ask the interviewer, specific to this role and "
+            "company as described in the job description - not generic filler"
+        ),
+    )
