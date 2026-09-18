@@ -26,14 +26,16 @@ either; there's no key input and no model name anywhere in the UI.
 
 ![Employee 360 walkthrough](docs/demo.gif)
 
-Starting from the landing page: a job seeker picks their view, checks a CV against a role
-and gets a score, a skill breakdown, an improvement plan and course suggestions; then the nav
-bar switches to the employer view, which bulk-screens three CVs into a ranked shortlist and
-schedules an interview with the top candidate.
+Starting from the landing page: a job seeker picks their view and checks a CV against a Data
+Engineer role. It comes back at 62% - short of the 75% bar, so the view adds a plan for
+reaching it and courses for the biggest gaps, then similar roles in the same family as the
+role being applied for, each with search keywords. The nav bar then switches to the employer
+view, which bulk-screens three CVs into a ranked shortlist and schedules an interview with the
+top candidate.
 
 *Animation not playing?* GitHub puts a play control on animated images and holds them still if
 your system prefers reduced motion. The same walkthrough is in
-**[`docs/demo.mp4`](docs/demo.mp4)** (1 MB), which plays with normal video controls.
+**[`docs/demo.mp4`](docs/demo.mp4)** (1.1 MB), which plays with normal video controls.
 
 > Recorded with sample CVs. The analysis text in the recording comes from a stubbed model so
 > the walkthrough is reproducible without an API key - the interface, charts and usage

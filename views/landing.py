@@ -145,8 +145,9 @@ def render(stats: UsageStats) -> None:
         st.markdown('<hr class="e360-rule">', unsafe_allow_html=True)
         st.markdown(
             '<div class="e360-section-title">See it run</div>'
-            '<p class="e360-section-sub">A job seeker checking their CV, then an employer '
-            "screening a stack of them into a ranked shortlist.</p>",
+            '<p class="e360-section-sub">A job seeker checking their CV: a score, a plan for '
+            "reaching 75%, and similar roles worth searching for - then an employer screening "
+            "a stack of CVs into a ranked shortlist.</p>",
             unsafe_allow_html=True,
         )
         st.image(str(DEMO_GIF), width="stretch")
