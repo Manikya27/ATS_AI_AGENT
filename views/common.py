@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import streamlit as st
 
-from ats_agent.models import CVReview, ImprovementPlan, JobSuggestions, MatchResult
+from ats_agent.models import CVReview, ImprovementPlan, InterviewPrep, JobSuggestions, MatchResult
 from ats_agent.stats import record_run
 from views.theme import ACCENT_NEUTRAL, ACCENT_POSITIVE, keyword_chips, section_label
 
@@ -246,3 +246,55 @@ def render_cv_review(review: CVReview) -> None:
             with st.expander(f"{tip.area} - {tip.impact} impact"):
                 st.markdown(f"**Today:** {tip.issue}")
                 st.markdown(f"**Change to:** {tip.fix}")
+
+
+# Read as a label in the expander title, so the candidate can triage the list
+# without opening anything.
+_CATEGORY_LABELS = {
+    "technical": "Technical",
+    "experience": "Your experience",
+    "behavioural": "Behavioural",
+    "gap": "The awkward one",
+    "motivation": "Motivation",
+}
+
+
+def render_interview_prep(prep: InterviewPrep) -> None:
+    """What a strong candidate is likely to be asked, and what to bring to each answer."""
+    st.markdown("#### Prepare for the interview")
+    st.caption(
+        "Your CV clears the bar for this role, so the next thing worth your time is the "
+        "conversation. These questions are predicted from this job description and your CV - "
+        "nobody here has seen the employer's actual interview or question list."
+    )
+    st.write(prep.readiness_summary)
+
+    if prep.questions:
+        section_label(f"{len(prep.questions)} questions worth rehearsing")
+        st.caption("Most likely first. Prepare from the top down if you are short of time.")
+        for i, q in enumerate(prep.questions, start=1):
+            category = _CATEGORY_LABELS.get(q.category, q.category.title())
+            # Likelihood goes in the collapsed label: the point of the list is
+            # knowing what to rehearse first, which is useless if you have to
+            # open every question to find out.
+            with st.expander(f"{i}. {q.question}  ·  {q.likelihood}"):
+                st.caption(category)
+                st.markdown(f"**Why it comes up:** {q.why_it_comes_up}")
+                st.markdown(f"**A strong answer:** {q.how_to_answer}")
+                if q.draw_on:
+                    st.markdown("**Draw on:**")
+                    for item in q.draw_on:
+                        st.markdown(f"- {item}")
+
+    if prep.questions_to_ask:
+        section_label("Ask them this", ACCENT_POSITIVE)
+        st.caption(
+            "Interviews run both ways, and a specific question lands better than a polite one."
+        )
+        for question in prep.questions_to_ask:
+            st.markdown(f"- {question}")
+
+    st.caption(
+        "Answer from your own experience rather than a script - these are the shape of a good "
+        "answer, not words to memorise."
+    )

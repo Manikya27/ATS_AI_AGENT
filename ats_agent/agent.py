@@ -10,11 +10,12 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import errors, types
 
-from .models import CVReview, ImprovementPlan, JobSuggestions, MatchResult
+from .models import CVReview, ImprovementPlan, InterviewPrep, JobSuggestions, MatchResult
 from .prompts import (
     CV_REVIEW_SYSTEM_PROMPT,
     CV_TO_MARKDOWN_SYSTEM_PROMPT,
     IMPROVEMENT_PLAN_SYSTEM_PROMPT,
+    INTERVIEW_PREP_SYSTEM_PROMPT,
     JOB_SUGGESTIONS_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
 )
@@ -90,6 +91,34 @@ class ATSAgent:
         plan = self._generate(IMPROVEMENT_PLAN_SYSTEM_PROMPT, user_prompt, ImprovementPlan)
         plan.target_match_percentage = STRONG_MATCH_THRESHOLD
         return plan
+
+    def prepare_interview(
+        self, resume_text: str, job_description: str, current_result: MatchResult
+    ) -> InterviewPrep:
+        """Likely interview questions for a CV that already clears the bar.
+
+        The counterpart to `suggest_improvement_plan`: once a candidate is a
+        strong match, the useful help stops being "how do I get shortlisted"
+        and becomes "what am I going to be asked".
+
+        These are questions predicted from this job description and this CV.
+        The agent has no view of the employer's actual interview process or
+        question bank, and the UI says so.
+        """
+        resume_text, job_description = self._prepare_documents(resume_text, job_description)
+
+        user_prompt = (
+            f"JOB DESCRIPTION:\n{job_description}\n\n"
+            f"CANDIDATE CV:\n{resume_text}\n\n"
+            f"Match score: {current_result.match_percentage}% ({current_result.verdict})\n"
+            f"Strengths already identified: {', '.join(current_result.strengths) or 'none listed'}\n"
+            f"Gaps already identified: {', '.join(current_result.gaps) or 'none listed'}\n"
+            f"Requirements the CV does not evidence: "
+            f"{', '.join(current_result.missing_skills) or 'none listed'}\n\n"
+            "What is this candidate most likely to be asked, and what should they have "
+            "thought through before the interview?"
+        )
+        return self._generate(INTERVIEW_PREP_SYSTEM_PROMPT, user_prompt, InterviewPrep)
 
     def review_cv(self, resume_text: str, job_description: str) -> CVReview:
         """Keyword coverage and formatting advice for this CV against this role.

@@ -43,6 +43,17 @@ with its own URL: Job Seeker (`?view=job-seeker`) and Employer (`?view=employer`
 - The plan also suggests the *kinds* of courses or certifications that would
   close the biggest skill gaps. These are described course types, not real
   named courses from a catalogue, and no provider is endorsed.
+- At {STRONG_MATCH_THRESHOLD}% or above the improvement plan is replaced by interview
+  preparation: 8-12 questions this pairing of CV and job description is likely
+  to produce, ordered by how reliably each comes up, plus a few questions to ask
+  the interviewer. Each question says why it comes up, what a strong answer
+  covers, and which things already on the CV are the best material for it.
+- Those questions include the awkward ones - a half-met requirement, a short
+  stint, a gap between roles - because an interviewer will ask and a prepared
+  candidate answers calmly.
+- They are predictions from the job description and the CV only. The app has no
+  view of any employer's real interview process or question bank, and it gives
+  the shape of a good answer rather than a script to memorise.
 - Every analysis also runs a keyword check against the job description's own
   wording. Terms the role screens on are listed as present, worded differently,
   or missing, split into required and preferred, with a note on what to do about
@@ -141,10 +152,11 @@ with its own URL: Job Seeker (`?view=job-seeker`) and Employer (`?view=employer`
   use it, but the free tier's per-minute limits apply. Screening a large batch of
   CVs may hit those limits, which the app reports per candidate rather than
   failing the whole run.
-- A single Job Seeker analysis makes several requests: cleaning the CV, scoring
-  it, the keyword and formatting check, the similar roles, and the improvement
-  plan when the score is below {STRONG_MATCH_THRESHOLD}%. Screening one uploaded CV costs two,
-  and each saved CV re-scored from the talent pool costs one more.
+- A single Job Seeker analysis makes five requests: cleaning the CV, scoring it,
+  the keyword and formatting check, the similar roles, and then either the
+  improvement plan (below {STRONG_MATCH_THRESHOLD}%) or the interview preparation (at or above it).
+  Screening one uploaded CV costs two, and each saved CV re-scored from the
+  talent pool costs one more.
 """
 
 ASSISTANT_SYSTEM_PROMPT = f"""\

@@ -10,7 +10,8 @@ the browser's back button works.
   Every run also tells you which of the role's own words your CV never says, how to
   restructure the document so it survives a skim, and which similar roles your CV already
   supports. Below 75% the agent adds a targeted improvement plan for reaching that bar, with
-  upskilling course suggestions.
+  upskilling course suggestions; at 75% or above it switches to interview preparation - the
+  questions this role and your CV are likely to produce, and what to bring to each answer.
 - **Employer** - paste a job description once, upload multiple candidate CVs, and get a ranked
   shortlist by match percentage. Candidates at 75% or above get a one-click "Schedule Google
   Meet interview" action, pre-filled with the candidate's email (extracted from their CV).
@@ -83,6 +84,16 @@ your system prefers reduced motion. The same walkthrough is in
   would suit this particular role, and specific layout/phrasing changes ranked high, medium
   or low impact. It judges the cleaned text, so it comments on structure and wording rather
   than fonts or margins it cannot see.
+- **Interview prep** (Job Seeker, at 75%+): once the CV clears the bar it has done its job,
+  so the view switches from fixing the CV to preparing for the conversation. 8-12 questions
+  this pairing of role and CV is likely to produce, ordered by how reliably each comes up,
+  each with why it's expected, what a strong answer covers, and which things already on the
+  CV are the best material for it - plus a few questions to ask the interviewer. It
+  deliberately includes the awkward ones (a half-met requirement, a short stint, a gap
+  between roles), because an interviewer will ask and a prepared candidate answers calmly.
+  These are **predicted from the job description and the CV** - nothing here has seen an
+  employer's real interview or question bank - and the prompt gives the shape of a good
+  answer rather than a script to memorise.
 - Below a 75% match, the Job Seeker view adds:
   - a gap analysis + specific, prioritized action items to reach 75%, written to encourage the
     candidate to keep going and upskill rather than to discourage them
@@ -118,7 +129,8 @@ views/
   common.py                   Shared UI helpers (API key lookup, result rendering, counters)
 ats_agent/
   agent.py                  ATSAgent - the product's core (cv_to_markdown, analyze,
-                             review_cv, suggest_improvement_plan, suggest_jobs)
+                             review_cv, suggest_improvement_plan, prepare_interview,
+                             suggest_jobs)
   models.py                   Pydantic schemas: MatchResult, CVReview, ImprovementPlan, ...
   parsers.py                   PDF/DOCX/TXT text extraction
   prompts.py                   System prompts for each agent capability (tone included)
@@ -238,8 +250,8 @@ run makes several calls.
 
 | Run | Calls |
 | --- | --- |
-| Job Seeker, CV at 75%+ | 4 - conversion, analysis, keyword/format review, similar roles |
-| Job Seeker, CV below 75% | 5 - the above plus the improvement plan |
+| Job Seeker, CV at 75%+ | 5 - conversion, analysis, keyword/format review, similar roles, interview prep |
+| Job Seeker, CV below 75% | 5 - the same, with the improvement plan in place of interview prep |
 | Employer, per uploaded CV | 2 - conversion, then analysis |
 | Employer, per talent-pool CV re-screened | 1 - already stored as clean Markdown |
 
@@ -267,6 +279,12 @@ if result.match_percentage < STRONG_MATCH_THRESHOLD:
     print(plan.gap_analysis, plan.action_items)
     for course in plan.recommended_courses:
         print(course.skill_or_topic, "->", course.course_suggestion)
+else:
+    # The CV already clears the bar, so the useful help is the interview.
+    prep = agent.prepare_interview(resume_md, job_description_text, result)
+    for q in prep.questions:
+        print(f"[{q.likelihood}] {q.question}")
+        print("   ", q.how_to_answer)
 
 # Which of the role's own terms the CV never says, plus how to lay the CV out.
 review = agent.review_cv(resume_md, job_description_text)

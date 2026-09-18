@@ -9,6 +9,7 @@ from views.common import (
     record_usage,
     render_cv_review,
     render_improvement_plan,
+    render_interview_prep,
     render_job_suggestions,
     render_result,
     require_api_key,
@@ -90,6 +91,7 @@ def render() -> None:
         st.session_state["js_last_result"] = result
         st.session_state["js_last_cv_review"] = None
         st.session_state["js_last_improvement_plan"] = None
+        st.session_state["js_last_interview_prep"] = None
         st.session_state["js_last_job_suggestions"] = None
         # Recording the run reruns the script, which throws away anything already
         # drawn - so a step that fails has to leave its message in state rather
@@ -107,8 +109,9 @@ def render() -> None:
             except ATSAgentError as e:
                 warnings.append(f"Couldn't run the keyword and formatting check: {e}")
 
-        # Anything short of a strong match gets the plan: the gap is worth closing
-        # whether it is a couple of points or a career step.
+        # The two sides of the bar need opposite things. Short of it, the useful
+        # help is closing the gap; at or above it the CV has done its job and
+        # the interview is what is left.
         if result.match_percentage < STRONG_MATCH_THRESHOLD:
             with st.spinner("Working out how to close the gap..."):
                 try:
@@ -117,6 +120,14 @@ def render() -> None:
                     )
                 except ATSAgentError as e:
                     warnings.append(f"Couldn't generate an improvement plan: {e}")
+        else:
+            with st.spinner("Working out what they're likely to ask you..."):
+                try:
+                    st.session_state["js_last_interview_prep"] = agent.prepare_interview(
+                        resume_md, job_description, result
+                    )
+                except ATSAgentError as e:
+                    warnings.append(f"Couldn't prepare interview questions: {e}")
 
         # Similar roles are useful at any score - a strong match still wants other
         # openings of the same kind to apply to.
@@ -146,6 +157,11 @@ def render() -> None:
         if improvement_plan is not None:
             st.divider()
             render_improvement_plan(improvement_plan)
+
+        interview_prep = st.session_state.get("js_last_interview_prep")
+        if interview_prep is not None:
+            st.divider()
+            render_interview_prep(interview_prep)
 
         job_suggestions = st.session_state.get("js_last_job_suggestions")
         if job_suggestions is not None:

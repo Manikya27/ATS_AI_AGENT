@@ -26,6 +26,8 @@ _CHOICES = (
             "How to restructure the CV so it lands in an eight-second skim",
             f"Under {STRONG_MATCH_THRESHOLD}%? A plan to get there, plus courses to close "
             "the gap",
+            f"Over {STRONG_MATCH_THRESHOLD}%? The questions you're likely to be asked, and what "
+            "to bring to each",
             "Similar roles your CV already fits, to widen the search",
         ],
         "cta": "Check my CV",
@@ -48,7 +50,7 @@ _CHOICES = (
 _STEPS = (
     ("Step 01", "Upload", "Drop in a CV and the job description - PDF, DOCX or plain text."),
     ("Step 02", "Analyse", "Each CV is cleaned into structured Markdown, then scored against every requirement in the role."),
-    ("Step 03", "Act", "Fix the CV with a concrete plan, or shortlist the candidate and book the interview."),
+    ("Step 03", "Act", "Fix the CV with a concrete plan, prepare for the interview you're about to get, or shortlist the candidate and book one."),
 )
 
 _FEATURES = (
@@ -81,6 +83,13 @@ _FAQ = (
         "Job Seeker view lists the terms the job description screens on and marks each one "
         "present, worded differently, or missing. Only add the ones your experience genuinely "
         "supports - stuffing a CV with terms you can't discuss costs you the interview.",
+    ),
+    (
+        "Are the interview questions the real ones?",
+        "No - and nothing here has seen an employer's actual interview. They are predicted "
+        "from the job description and your CV: what the role is built around, what on your CV "
+        "an interviewer will want to open up, and where the two don't quite line up. Each one "
+        "says why it's expected, so you can judge the reasoning rather than trust the list.",
     ),
     (
         "How accurate is the score?",
