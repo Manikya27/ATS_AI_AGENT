@@ -5,7 +5,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from ats_agent.agent import IMPROVEMENT_TARGET_PERCENTAGE, LOW_MATCH_THRESHOLD
+from ats_agent.agent import STRONG_MATCH_THRESHOLD
 from ats_agent.knowledge import MAX_CANDIDATES
 from ats_agent.scheduling import MEETING_ELIGIBLE_THRESHOLD
 from ats_agent.stats import UsageStats
@@ -22,9 +22,9 @@ _CHOICES = (
         "points": [
             "A match score with the skills you hit and the ones you miss",
             "Honest, encouraging feedback - never a blunt rejection",
-            f"Under {LOW_MATCH_THRESHOLD}%? A plan to reach ~{IMPROVEMENT_TARGET_PERCENTAGE}%, "
-            "plus courses to close the gap",
-            "Other roles your CV already fits today",
+            f"Under {STRONG_MATCH_THRESHOLD}%? A plan to get there, plus courses to close "
+            "the gap",
+            "Similar roles your CV already fits, to widen the search",
         ],
         "cta": "Check my CV",
     },
@@ -145,8 +145,9 @@ def render(stats: UsageStats) -> None:
         st.markdown('<hr class="e360-rule">', unsafe_allow_html=True)
         st.markdown(
             '<div class="e360-section-title">See it run</div>'
-            '<p class="e360-section-sub">A job seeker checking their CV, then an employer '
-            "screening a stack of them into a ranked shortlist.</p>",
+            '<p class="e360-section-sub">A job seeker checking their CV: a score, a plan for '
+            "reaching 75%, and similar roles worth searching for - then an employer screening "
+            "a stack of CVs into a ranked shortlist.</p>",
             unsafe_allow_html=True,
         )
         st.image(str(DEMO_GIF), width="stretch")

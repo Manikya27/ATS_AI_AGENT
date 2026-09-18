@@ -6,7 +6,7 @@ assistant cannot quietly drift out of date when a threshold changes.
 """
 from __future__ import annotations
 
-from .agent import IMPROVEMENT_TARGET_PERCENTAGE, LOW_MATCH_THRESHOLD
+from .agent import STRONG_MATCH_THRESHOLD
 from .parsers import SUPPORTED_EXTENSIONS
 from .scheduling import (
     DEFAULT_MEETING_DURATION_MINUTES,
@@ -35,14 +35,20 @@ with its own URL: Job Seeker (`?view=job-seeker`) and Employer (`?view=employer`
 - The result breaks down into matched skills, missing skills, strengths, gaps,
   and concrete suggestions for improving the CV. A small bar chart compares the
   number of matched against missing skills.
-- If the score is below {LOW_MATCH_THRESHOLD}%, two extra sections appear: a plan for
-  reaching about {IMPROVEMENT_TARGET_PERCENTAGE}% (a gap analysis plus prioritised action items),
-  and suggested job titles that better fit the CV as it stands today.
+- Anything below {STRONG_MATCH_THRESHOLD}% is treated as not yet a strong match, and an
+  improvement plan appears: a gap analysis plus prioritised action items for
+  reaching {STRONG_MATCH_THRESHOLD}%. It is written to encourage the person to close the gap,
+  whether that gap is a couple of points or a genuine career step.
 - The plan also suggests the *kinds* of courses or certifications that would
   close the biggest skill gaps. These are described course types, not real
   named courses from a catalogue, and no provider is endorsed.
-- Suggested job titles are generated from the CV alone. They are not live job
-  listings, and the app never claims a specific company is hiring.
+- Every analysis also suggests similar roles worth searching for: jobs of the
+  same kind as the one they are targeting that their CV already supports, each
+  with search keywords to paste into a job board. These appear at any score,
+  because a strong match still benefits from other openings to apply to.
+- Those role suggestions are inferred from the CV and the target role. The app
+  has no job-board access and no view of live vacancies, so it never says a
+  named company is hiring or that a specific opening exists.
 
 ## Employer view
 - One job description, up to {MAX_CANDIDATES} candidate CVs per run.
