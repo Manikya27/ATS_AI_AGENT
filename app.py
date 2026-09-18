@@ -9,14 +9,16 @@ from __future__ import annotations
 
 import streamlit as st
 
+from ats_agent.stats import load_stats
 from views import employer, job_seeker
+from views.theme import inject_theme, render_header
 
 st.set_page_config(page_title="Employee 360", page_icon="🎯", layout="wide")
 
-st.title("🎯 Employee 360")
-st.caption("AI-powered CV ↔ job description matching for job seekers and employers.")
+inject_theme()
+render_header(st.session_state.get("usage_stats") or load_stats())
 
-tab_job_seeker, tab_employer = st.tabs(["🧑‍💻 Job Seeker", "🏢 Employer"])
+tab_job_seeker, tab_employer = st.tabs(["JOB SEEKER", "EMPLOYER"])
 
 with tab_job_seeker:
     job_seeker.render()

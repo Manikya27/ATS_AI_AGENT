@@ -18,8 +18,24 @@ Both views share the same core agent, packaged as a small, reusable product
 The API key and model are **server-side configuration only** - visitors never see or enter
 either; there's no key input and no model name anywhere in the UI.
 
+## Demo
+
+![Employee 360 walkthrough](docs/demo.gif)
+
+A job seeker checks their CV against a role and gets a score, a skill breakdown, an
+improvement plan and course suggestions; an employer then bulk-screens three CVs into a
+ranked shortlist and schedules an interview with the top candidate. Higher-quality version:
+[`docs/demo.mp4`](docs/demo.mp4).
+
+> Recorded with sample CVs. The analysis text in the recording comes from a stubbed model so
+> the walkthrough is reproducible without an API key - the interface, charts and usage
+> counters are the real app.
+
 ## Features
 
+- Premium black-and-orange dark theme, set via `.streamlit/config.toml` plus a small
+  brand stylesheet (`views/theme.py`) - simple system sans throughout
+- Live usage stats in the header (people helped, CVs analysed, roles matched)
 - Job Seeker / Employer views, selected via tabs at the top of the page (no sidebar)
 - Upload CVs and job descriptions as PDF, DOCX, or TXT
 - Every CV is first converted to clean, structured Markdown by the model, and that version is
@@ -52,10 +68,12 @@ either; there's no key input and no model name anywhere in the UI.
 
 ```
 app.py                    Entry point: title + Job Seeker/Employer tabs
+.streamlit/config.toml    Black/orange theme (colours, fonts, radii, chart palette)
 views/
-  job_seeker.py            Job Seeker view - single CV vs. one job description
-  employer.py               Employer view - bulk CV screening + ranked shortlist
-  common.py                  Shared UI helpers (server-side API key lookup, result rendering)
+  theme.py                 Brand chrome: stylesheet, hero header, stat tiles
+  job_seeker.py             Job Seeker view - single CV vs. one job description
+  employer.py                Employer view - bulk CV screening + ranked shortlist
+  common.py                   Shared UI helpers (API key lookup, result rendering, counters)
 ats_agent/
   agent.py                  ATSAgent - the product's core (cv_to_markdown, analyze,
                              suggest_improvement_plan, suggest_jobs)
@@ -63,6 +81,7 @@ ats_agent/
   parsers.py                   PDF/DOCX/TXT text extraction
   prompts.py                   System prompts for each agent capability (tone included)
   scheduling.py                 CV email extraction + Google Calendar meeting link builder
+  stats.py                       Persistent usage counters behind the header stats
 Dockerfile                 Container image for hosting the app as a service
 ```
 
@@ -97,6 +116,17 @@ top of the page to switch between the Job Seeker and Employer views.
 |---|---|---|
 | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Gemini API key (server-side only, required) | none - the app shows a "not configured" error until set |
 | `ATS_AGENT_MODEL` | Gemini model to use (server-side only) | `gemini-2.5-flash` |
+| `ATS_STATS_PATH` | Where the usage counters are stored | `data/usage_stats.json` |
+
+### Usage stats
+
+The three figures in the header are **real counters**, incremented only when a run actually
+succeeds - they start at zero on a fresh deployment and are not seeded with a marketing
+number. `people_helped` counts browser sessions that completed at least one run, `cvs_analyzed`
+counts CVs processed, and `roles_matched` counts job descriptions matched against.
+
+They live in a JSON file at `ATS_STATS_PATH`. Container filesystems are ephemeral, so **mount a
+volume at that path** (or point it at one) if you want the counts to survive a redeploy.
 
 ## Hosting as a service
 
