@@ -23,23 +23,31 @@ the browser's back button works.
 Both views share the same core agent, packaged as a small, reusable product
 ([`ats_agent`](./ats_agent), `ATSAgent`) rather than a one-off script.
 
-The API key and model are **server-side configuration only** - visitors never see or enter
-either; there's no key input and no model name anywhere in the UI.
+Visitors **pick a side at the entrance**. An employer is never shown the Job Seeker view and
+a job seeker is never shown the Employer view - the choice rides in the URL as `?as=`, and a
+"switch" link in the nav bar leads back to the chooser. This is a preference, not a login:
+there are no accounts and no passwords, so anyone can change the URL. Every string in the UI
+is worded to avoid implying otherwise.
+
+Visitors also **pick which model** runs the analysis, from the list this deployment allows.
+The **API key remains server-side configuration only** - never shown, never collected, no key
+input anywhere in the UI.
 
 ## Demo
 
 ![Employee 360 walkthrough](docs/demo.gif)
 
-Starting from the landing page: a job seeker picks their view and checks a CV against a Data
-Engineer role. It comes back at 62% - short of the 75% bar, so the view adds a plan for
-reaching it and courses for the biggest gaps, then similar roles in the same family as the
-role being applied for, each with search keywords. The nav bar then switches to the employer
-view, which bulk-screens three CVs into a ranked shortlist and schedules an interview with the
-top candidate.
+Starting from the landing page: a visitor picks a side and enters as a job seeker, so the nav
+bar from then on offers only that side. They choose a model, then check a CV against a Data
+Engineer role. It comes back at 62% - short of the 75% bar - with the keyword screen showing
+which of the role's own words the CV never says, the format review, and a plan for reaching
+75%. The nav's "switch" link goes back to the chooser, this time into the employer view, where
+a team workspace is named, a stack of CVs is screened into a ranked shortlist, and a candidate
+saved during an earlier role surfaces because they also clear the bar for this one.
 
 *Animation not playing?* GitHub puts a play control on animated images and holds them still if
 your system prefers reduced motion. The same walkthrough is in
-**[`docs/demo.mp4`](docs/demo.mp4)** (1.1 MB), which plays with normal video controls.
+**[`docs/demo.mp4`](docs/demo.mp4)** (1.2 MB), which plays with normal video controls.
 
 > Recorded with sample CVs. The analysis text in the recording comes from a stubbed model so
 > the walkthrough is reproducible without an API key - the interface, charts and usage
@@ -49,6 +57,15 @@ your system prefers reduced motion. The same walkthrough is in
 
 - Landing page with the product overview, how-it-works, an embedded demo and an FAQ, plus
   two cards for choosing a view - the whole card is the link
+- **Persona routing**: the card you click sets `?as=job-seeker` or `?as=employer`, and from
+  then on the nav bar, the landing page and the router all offer only that side. A link
+  shared for the other side lands on the chooser rather than on an error. It is a
+  preference, not access control - stated plainly wherever it appears
+- **Model picker**: a chooser on every working view, listing the models this deployment
+  allows. The list is filtered at runtime against what the configured API key can actually
+  reach, so an allowlisted-but-unavailable model is hidden rather than offered as a broken
+  choice. The selection travels as `?model=` and is re-validated against the allowlist on
+  every request, because a query parameter is visitor input
 - URL-routed views with a persistent nav bar; back/forward and shareable links both work
 - In-app assistant: a conversational view for questions about the product, answering only
   from a curated reference whose numbers are interpolated from the app's own constants, so
@@ -110,7 +127,10 @@ your system prefers reduced motion. The same walkthrough is in
   is already in the pool is flagged as screened before. At most 10 saved CVs are re-scored
   per run, picked by plain word overlap with the role (no model call) because each actual
   scoring costs a request. Entries are deleted automatically 90 days after they were last
-  screened, and the whole pool can be cleared from the view.
+  screened, and the whole pool can be cleared from the view. Pools are divided into
+  **workspaces**: an employer names their team and sees only the candidates saved under that
+  name. A workspace is a partition, not a permission - the name is in the URL and anyone who
+  knows it can open it.
 - Runs on **Google Gemini's free tier** (`gemini-2.5-flash` by default) - no paid API required
 - Dockerized for hosting as a service (Render, Railway, Fly.io, or any container host)
 
@@ -120,7 +140,9 @@ your system prefers reduced motion. The same walkthrough is in
 app.py                    Entry point: routes ?view= to the landing page or a view
 .streamlit/config.toml    Black/orange theme (colours, fonts, radii, chart palette)
 views/
-  landing.py               Landing page: overview, view chooser, demo, FAQ
+  landing.py               Landing page: overview, persona chooser, demo, FAQ
+  persona.py                Which side the visitor is here as, and what they see
+  model_picker.py            The model chooser and the validated current selection
   assistant.py              Assistant view - grounded chat about the product
   router.py                  Query-param routing (one URL per view)
   theme.py                   Brand chrome: stylesheet, nav bar, stat tiles
@@ -137,6 +159,7 @@ ats_agent/
   knowledge.py                  Product reference + rules behind the in-app assistant
   scheduling.py                 CV email extraction + Google Calendar meeting link builder
   talent_pool.py                 Opt-in storage of screened CVs + the lexical pre-ranker
+  model_catalog.py                Which models are offered, and runtime availability checks
   stats.py                       Persistent usage counters behind the header stats
 Dockerfile                 Container image for hosting the app as a service
 ```
@@ -181,10 +204,41 @@ results - those live in the view that produced them, which is a separate session
 | Env var | Purpose | Default |
 |---|---|---|
 | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Gemini API key (server-side only, required) | none - the app shows a "not configured" error until set |
-| `ATS_AGENT_MODEL` | Gemini model to use (server-side only) | `gemini-2.5-flash` |
+| `ATS_AGENT_MODEL` | The default model, used when a visitor doesn't pick one | `gemini-2.5-flash` |
+| `ATS_AGENT_MODELS` | Comma-separated allowlist of models the picker offers | four Gemini models (see below) |
 | `ATS_STATS_PATH` | Where the usage counters are stored | `data/usage_stats.json` |
 | `ATS_TALENT_POOL_PATH` | Where opt-in saved CVs are stored | `data/talent_pool.json` |
 | `ATS_TALENT_POOL_RETENTION_DAYS` | How long a saved CV survives after it was last screened | `90` |
+
+### Choosing a model
+
+`ATS_AGENT_MODELS` is an allowlist. It defaults to `gemini-2.5-flash`,
+`gemini-2.5-flash-lite`, `gemini-2.5-pro` and `gemini-2.0-flash`, and `ATS_AGENT_MODEL`
+(the default selection) is always added to it whether or not it's listed.
+
+On top of the allowlist the app asks the provider which models the configured key can
+actually generate content with, and shows the intersection. That means:
+
+- a model you allowlist but your key can't reach is hidden instead of failing on first use
+- the discovery result is cached for 15 minutes, so a Streamlit rerun never costs an API call
+- if discovery fails (provider down, SDK change, no key yet) the allowlist is offered
+  unfiltered rather than the picker going empty
+
+A model arriving in `?model=` is visitor input: it is checked against the allowlist on every
+request and silently falls back to the default if it isn't on it. The picker hides itself
+when only one model is on offer, since that isn't a choice.
+
+### Personas
+
+There is no authentication in this product. `?as=job-seeker` / `?as=employer` decides which
+views are offered and nothing more — anyone can edit the URL and see the other side. It exists
+so the product reads as one tool for you rather than a demo of two tools, not to protect
+anything. If you need real access control, put an authenticating proxy in front of the app or
+add accounts; the persona layer is not a substitute and the UI never claims it is.
+
+The same applies to talent pool workspaces: naming a workspace separates one team's saved
+candidates from another's, but the name is in the URL and unguessable names are the only thing
+standing between two teams on one deployment. Scope it properly before you rely on it.
 
 ### Usage stats
 
@@ -220,9 +274,10 @@ pool can be cleared from the Employer view.
 
 Two things to be clear about before enabling it:
 
-- **There are no user accounts.** The pool belongs to the deployment, so everyone using the
-  Employer view of the same instance sees the same saved candidates. If you host this for more
-  than one employer, add authentication and scope the pool per account first.
+- **There are no user accounts.** Workspaces divide the pool by a name the employer types,
+  which keeps two teams out of each other's way, but the name travels in the URL and nothing
+  verifies who is using it. If you host this for more than one employer, put real
+  authentication in front of it and scope the pool per account before relying on the split.
 - **Saved CVs are personal data.** Retaining a candidate's details needs a lawful basis under
   GDPR and equivalent regimes, and candidates generally have a right to see and delete what you
   hold. The retention window and the delete button exist to help with that; they are not by

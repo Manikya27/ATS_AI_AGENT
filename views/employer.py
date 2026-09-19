@@ -13,6 +13,7 @@ from ats_agent.models import MatchResult
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
 from ats_agent.scheduling import MEETING_ELIGIBLE_THRESHOLD, extract_email, google_calendar_meeting_link
 from ats_agent.talent_pool import (
+    DEFAULT_WORKSPACE,
     MAX_RESCREEN,
     RETENTION_DAYS,
     PooledCandidate,
@@ -23,6 +24,8 @@ from ats_agent.talent_pool import (
     remember,
 )
 from views.common import COLOR_MATCHED, record_usage, render_result, require_api_key
+from views.model_picker import selected_model
+from views.persona import current_workspace, normalise_workspace, set_workspace
 from views.theme import ACCENT_POSITIVE, badge, section_label, step_label, view_header
 
 
@@ -105,11 +108,12 @@ def render() -> None:
             st.error("Please provide a job description (upload a file or paste text).")
             st.stop()
 
-        agent = ATSAgent(api_key=api_key)
+        agent = ATSAgent(api_key=api_key, model=selected_model())
         save_to_pool = st.session_state.get("em_save_pool", False)
+        workspace = current_workspace()
         # Read once, before this run writes anything: a CV saved a moment ago
         # would otherwise report itself as a returning candidate.
-        pool_before = load_pool()
+        pool_before = load_pool(workspace)
         known_ids = {c.id: c for c in pool_before}
 
         candidates: list[CandidateResult] = []
@@ -153,7 +157,10 @@ def render() -> None:
             for candidate in candidates:
                 if candidate.resume_md:
                     remember(
-                        Path(candidate.filename).stem, candidate.resume_md, candidate.email
+                        Path(candidate.filename).stem,
+                        candidate.resume_md,
+                        candidate.email,
+                        workspace,
                     )
 
         # Every saved CV that was re-scored is a CV analysed, not just the ones
@@ -222,8 +229,31 @@ def _plural(count: int, noun: str) -> str:
 
 
 def _render_pool_controls() -> None:
-    """The consent checkbox and the state of what is currently stored."""
-    pool = load_pool()
+    """The consent checkbox, the workspace, and what is currently stored."""
+    workspace = current_workspace()
+    pool = load_pool(workspace)
+
+    name_col, _ = st.columns([1, 1])
+    with name_col:
+        typed = st.text_input(
+            "Team workspace",
+            value="" if workspace == DEFAULT_WORKSPACE else workspace,
+            placeholder=DEFAULT_WORKSPACE,
+            key="em_workspace",
+            help=(
+                "Which pool of saved CVs you are working in. Name your team to keep your "
+                "saved candidates separate from other teams using this deployment."
+            ),
+        )
+    if normalise_workspace(typed) != workspace:
+        set_workspace(typed)
+
+    st.caption(
+        f"Working in **{workspace}**. This separates one team's saved candidates from "
+        "another's - it is not a login. There are no accounts here, the workspace name is "
+        "visible in the URL, and anyone who knows a name can open it."
+    )
+
     st.checkbox(
         "Save these CVs to the talent pool",
         value=False,
@@ -243,7 +273,7 @@ def _render_pool_controls() -> None:
     if not pool:
         return
 
-    with st.expander(f"Talent pool: {_plural(len(pool), 'saved candidate')}"):
+    with st.expander(f"Talent pool ({workspace}): {_plural(len(pool), 'saved candidate')}"):
         for candidate in pool[:POOL_PREVIEW]:
             st.markdown(
                 f"- **{candidate.label}** - saved {candidate.added_on}, "
@@ -251,9 +281,9 @@ def _render_pool_controls() -> None:
             )
         if len(pool) > POOL_PREVIEW:
             st.caption(f"...and {len(pool) - POOL_PREVIEW} more.")
-        if st.button("Delete every saved CV", key="em_clear_pool"):
-            clear_pool()
-            st.success("Talent pool cleared.")
+        if st.button(f"Delete every saved CV in {workspace}", key="em_clear_pool"):
+            clear_pool(workspace)
+            st.success(f"Talent pool for {workspace} cleared.")
             st.rerun()
 
 

@@ -10,6 +10,12 @@ and the email extracted from it. What is not: the original file. Entries older
 than the retention window are dropped whenever the pool is read, so an employer
 who stops using the app stops holding the data.
 
+Entries are partitioned by workspace, so one team's saved candidates do not
+appear in another's. That is a partition, not a permission: the app has no
+accounts, the workspace name travels in the URL, and anyone who knows a name
+can work in it. It keeps two teams sharing a deployment out of each other's
+way; it does not keep them out of each other's data.
+
 The file lives at ATS_TALENT_POOL_PATH. On an ephemeral container mount a
 volume there, or the pool empties when the container is replaced.
 
@@ -45,6 +51,11 @@ MAX_STORED_CHARS = 20_000
 # promising few are actually screened.
 MAX_RESCREEN = 10
 
+# The partition an employer works in until they name their own. Entries saved
+# before workspaces existed have no workspace field and land here, which is the
+# behaviour they already had.
+DEFAULT_WORKSPACE = "shared"
+
 _LOCK = threading.Lock()
 
 _WORD_RE = re.compile(r"[a-z0-9+#.]{2,}")
@@ -71,6 +82,7 @@ class PooledCandidate:
     added_at: str
     last_seen_at: str
     times_seen: int = 1
+    workspace: str = DEFAULT_WORKSPACE
 
     @property
     def added_on(self) -> str:
@@ -90,8 +102,17 @@ def candidate_id(resume_md: str, email: str | None) -> str:
     return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
 
 
-def load_pool() -> list[PooledCandidate]:
-    """Every saved candidate that hasn't expired, most recently seen first."""
+def load_pool(workspace: str = DEFAULT_WORKSPACE) -> list[PooledCandidate]:
+    """One workspace's unexpired candidates, most recently seen first."""
+    return [c for c in _load_all() if c.workspace == workspace]
+
+
+def _load_all() -> list[PooledCandidate]:
+    """Every unexpired candidate across every workspace.
+
+    Only the storage functions want this: a write has to preserve the
+    workspaces it is not touching.
+    """
     try:
         raw = json.loads(POOL_PATH.read_text())
     except (OSError, ValueError):
@@ -116,14 +137,24 @@ def load_pool() -> list[PooledCandidate]:
     return entries
 
 
-def remember(label: str, resume_md: str, email: str | None) -> PooledCandidate:
-    """Add a CV to the pool, or refresh the entry that person already has."""
+def remember(
+    label: str,
+    resume_md: str,
+    email: str | None,
+    workspace: str = DEFAULT_WORKSPACE,
+) -> PooledCandidate:
+    """Add a CV to this workspace, or refresh the entry that person has in it.
+
+    The same person saved in two workspaces is two entries, deliberately: each
+    team's pool is its own, including how many times they have seen someone.
+    """
     now = _now().isoformat()
     entry_id = candidate_id(resume_md, email)
 
     with _LOCK:
-        pool = load_pool()
-        existing = next((c for c in pool if c.id == entry_id), None)
+        everything = _load_all()
+        mine = [c for c in everything if c.workspace == workspace]
+        existing = next((c for c in mine if c.id == entry_id), None)
         entry = PooledCandidate(
             id=entry_id,
             label=label,
@@ -132,23 +163,33 @@ def remember(label: str, resume_md: str, email: str | None) -> PooledCandidate:
             added_at=existing.added_at if existing else now,
             last_seen_at=now,
             times_seen=(existing.times_seen + 1) if existing else 1,
+            workspace=workspace,
         )
-        pool = [c for c in pool if c.id != entry_id]
-        pool.insert(0, entry)
-        _write(pool[:MAX_POOL_ENTRIES])
+        mine = [entry] + [c for c in mine if c.id != entry_id]
+        others = [c for c in everything if c.workspace != workspace]
+        # The cap is per workspace, so one busy team cannot evict another's.
+        _write(mine[:MAX_POOL_ENTRIES] + others)
     return entry
 
 
-def forget(entry_id: str) -> None:
-    """Delete one candidate from the pool."""
+def forget(entry_id: str, workspace: str = DEFAULT_WORKSPACE) -> None:
+    """Delete one candidate from one workspace."""
     with _LOCK:
-        _write([c for c in load_pool() if c.id != entry_id])
+        _write([
+            c for c in _load_all()
+            if not (c.id == entry_id and c.workspace == workspace)
+        ])
 
 
-def clear_pool() -> None:
-    """Delete every saved candidate."""
+def clear_pool(workspace: str = DEFAULT_WORKSPACE) -> None:
+    """Delete every saved candidate in one workspace, leaving others alone."""
     with _LOCK:
-        _write([])
+        _write([c for c in _load_all() if c.workspace != workspace])
+
+
+def workspaces() -> list[str]:
+    """Every workspace that currently holds at least one saved candidate."""
+    return sorted({c.workspace for c in _load_all()})
 
 
 def rank_for_role(
