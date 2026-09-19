@@ -1,7 +1,6 @@
 """The ATS matching agent - the product's core."""
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping, Sequence
 from typing import TypeVar
 
@@ -10,6 +9,7 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import errors, types
 
+from .model_catalog import DEFAULT_MODEL_ID, resolve
 from .models import CVReview, ImprovementPlan, InterviewPrep, JobSuggestions, MatchResult
 from .prompts import (
     CV_REVIEW_SYSTEM_PROMPT,
@@ -20,8 +20,10 @@ from .prompts import (
     SYSTEM_PROMPT,
 )
 
-# gemini-2.5-flash is available on Google AI Studio's free tier.
-DEFAULT_MODEL = os.environ.get("ATS_AGENT_MODEL", "gemini-2.5-flash")
+# Which models a visitor may pick between, and which one they get by default,
+# live in model_catalog. Re-exported here because ATSAgent(model=...) is the
+# public way to choose one.
+DEFAULT_MODEL = DEFAULT_MODEL_ID
 
 # Rough character budget to stay well within context and keep the free tier's
 # per-request quota predictable.
@@ -42,9 +44,11 @@ class ATSAgentError(Exception):
 class ATSAgent:
     """Compares a candidate's CV against a job description and scores the match."""
 
-    def __init__(self, api_key: str | None = None, model: str = DEFAULT_MODEL):
+    def __init__(self, api_key: str | None = None, model: str | None = None):
         self.client = genai.Client(api_key=api_key) if api_key else genai.Client()
-        self.model = model
+        # A model arriving from the UI is visitor input, so it is resolved
+        # against what this deployment offers rather than trusted as given.
+        self.model = resolve(model, self.client)
 
     def cv_to_markdown(self, resume_text: str) -> str:
         """Clean/reformat raw extracted CV text into compact Markdown.

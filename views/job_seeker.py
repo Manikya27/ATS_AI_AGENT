@@ -5,6 +5,7 @@ import streamlit as st
 
 from ats_agent import ATSAgent, ATSAgentError, STRONG_MATCH_THRESHOLD
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
+from views.model_picker import selected_model
 from views.common import (
     record_usage,
     render_cv_review,
@@ -72,7 +73,7 @@ def render() -> None:
             st.error("Please provide a job description (upload a file or paste text).")
             st.stop()
 
-        agent = ATSAgent(api_key=api_key)
+        agent = ATSAgent(api_key=api_key, model=selected_model())
 
         with st.spinner("Reading your CV..."):
             try:

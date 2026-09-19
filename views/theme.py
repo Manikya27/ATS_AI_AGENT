@@ -246,6 +246,15 @@ _CSS = f"""
     transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
   }}
   .e360-nav-links a:hover {{ color: {TEXT} !important; background: {SURFACE}; }}
+  .e360-nav-links a.e360-nav-persona {{
+    margin-left: 0.5rem;
+    padding-left: 0.85rem;
+    border-left: 1px solid {BORDER};
+    color: {MUTED} !important;
+    font-weight: 600;
+    border-radius: 0;
+  }}
+  .e360-nav-links a.e360-nav-persona:hover {{ background: transparent; color: {ORANGE} !important; }}
   .e360-nav-links a.active {{
     color: {ORANGE} !important;
     border-color: rgba(255, 122, 31, 0.35);
@@ -535,18 +544,34 @@ def render_stat_tiles(stats: UsageStats, note: str | None = None) -> None:
 
 
 def render_navbar(active: str) -> None:
-    """Brand + view switcher shown on the inner pages."""
-    from views.router import ASSISTANT, EMPLOYER, JOB_SEEKER, href
+    """Brand + view switcher shown on the inner pages.
+
+    Only the views this visitor's persona is offered appear here. An employer
+    is never shown a door into the job seeker view, and vice versa - that is
+    the whole point of choosing a side at the entrance.
+    """
+    from views.persona import PERSONA_LABELS, current_persona, visible_views
+    from views.router import ASSISTANT, VIEW_LABELS, href
+
+    persona = current_persona()
+    entries = [(view, VIEW_LABELS[view]) for view in visible_views(persona)]
+    entries.append((ASSISTANT, VIEW_LABELS[ASSISTANT]))
 
     links = "".join(
         f'<a href="{href(view)}" target="_self" '
         f'class="{"active" if view == active else ""}">{html.escape(label)}</a>'
-        for view, label in (
-            (JOB_SEEKER, "Job Seeker"),
-            (EMPLOYER, "Employer"),
-            (ASSISTANT, "Assistant"),
-        )
+        for view, label in entries
     )
+
+    # Leaving the persona is a link back to the landing page with ?as= dropped,
+    # so the chooser comes back rather than bouncing straight into a view.
+    if persona:
+        links += (
+            f'<a class="e360-nav-persona" href="{href("home", **{"as": None, "ws": None})}" '
+            f'target="_self" title="Switch to the other side of the product">'
+            f'{html.escape(PERSONA_LABELS[persona])} &middot; switch</a>'
+        )
+
     st.markdown(
         '<div class="e360-nav">'
         f'<a class="e360-nav-brand" href="{href("home")}" target="_self">'

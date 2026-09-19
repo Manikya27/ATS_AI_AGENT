@@ -106,12 +106,18 @@ _FAQ = (
 
 
 def _choice_card(choice: dict) -> str:
+    """One entrance card. Clicking it is how a visitor picks their persona.
+
+    The persona rides in the link itself rather than being set by a button:
+    every navigation here is a full page load, so the URL has to carry it.
+    """
     # Spans only, no block-level tags: Streamlit runs this through a markdown
     # parser, which would hoist a <div>/<ul> out of the inline <a> and split the
     # card into separate boxes. CSS gives these spans their block layout.
     points = "".join(f'<span class="e360-choice-point">{p}</span>' for p in choice["points"])
+    link = href(choice["view"], **{"as": choice["view"]})
     return (
-        f'<a class="e360-choice" href="{href(choice["view"])}" target="_self">'
+        f'<a class="e360-choice" href="{link}" target="_self">'
         f'<span class="e360-choice-kicker">{choice["kicker"]}</span>'
         f'<span class="e360-choice-title">{choice["title"]}</span>'
         f"{points}"
@@ -120,7 +126,7 @@ def _choice_card(choice: dict) -> str:
     )
 
 
-def render(stats: UsageStats) -> None:
+def render(stats: UsageStats, persona: str | None = None) -> None:
     # --- Hero ---------------------------------------------------------
     st.markdown(
         '<div class="e360-eyebrow">ATS intelligence</div>'
@@ -138,13 +144,28 @@ def render(stats: UsageStats) -> None:
     st.markdown(
         '<div class="e360-section-title">Where would you like to start?</div>'
         '<p class="e360-section-sub">Two views, one engine. Pick the side of the table '
-        "you're sitting on - you can switch at any time.</p>",
+        "you're sitting on - the product then shows you only that side, and you can "
+        "switch whenever you like.</p>",
         unsafe_allow_html=True,
     )
-    left, right = st.columns(2, gap="medium")
-    for column, choice in zip((left, right), _CHOICES):
+    # Once someone has picked a side, the landing page stops offering both.
+    # Showing an employer the job seeker door on every visit home is exactly
+    # the noise choosing a persona is meant to remove.
+    choices = [c for c in _CHOICES if persona is None or c["view"] == persona]
+    columns = st.columns(2, gap="medium") if len(choices) > 1 else [st.container()]
+    for column, choice in zip(columns, choices):
         with column:
             st.markdown(_choice_card(choice), unsafe_allow_html=True)
+
+    if persona is not None:
+        other = next(c for c in _CHOICES if c["view"] != persona)
+        st.markdown(
+            f'<p class="e360-section-sub" style="margin-top:1rem">Here for the other side? '
+            f'<a href="{href(other["view"], **{"as": other["view"]})}" target="_self" '
+            f'class="e360-inline-link">{other["cta"]}</a> instead - you can switch back '
+            "at any time.</p>",
+            unsafe_allow_html=True,
+        )
 
     # --- How it works -------------------------------------------------
     st.markdown('<hr class="e360-rule">', unsafe_allow_html=True)

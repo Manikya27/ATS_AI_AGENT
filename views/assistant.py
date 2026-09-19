@@ -5,6 +5,7 @@ import streamlit as st
 
 from ats_agent import ATSAgent, ATSAgentError
 from ats_agent.knowledge import STARTER_QUESTIONS
+from views.model_picker import selected_model
 from views.common import require_api_key
 from views.theme import view_header
 
@@ -25,7 +26,7 @@ def _answer(question: str) -> None:
     prior = list(history)
     history.append({"role": "user", "content": question})
     try:
-        answer = ATSAgent(api_key=api_key).answer_question(question, prior)
+        answer = ATSAgent(api_key=api_key, model=selected_model()).answer_question(question, prior)
     except ATSAgentError as e:
         # Keep the failure in the transcript so the person can see what happened
         # against their question, rather than a banner that vanishes on rerun.
