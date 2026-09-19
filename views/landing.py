@@ -189,9 +189,9 @@ def render(stats: UsageStats, persona: str | None = None) -> None:
         st.markdown('<hr class="e360-rule">', unsafe_allow_html=True)
         st.markdown(
             '<div class="e360-section-title">See it run</div>'
-            '<p class="e360-section-sub">A job seeker checking their CV: a score, a plan for '
-            "reaching 75%, and similar roles worth searching for - then an employer screening "
-            "a stack of CVs into a ranked shortlist.</p>",
+            '<p class="e360-section-sub">Choosing a side and a model, then a job seeker\'s '
+            "keyword screen and plan - and an employer whose talent pool turns up someone they "
+            "saved on an earlier role.</p>",
             unsafe_allow_html=True,
         )
         st.image(str(DEMO_GIF), width="stretch")
