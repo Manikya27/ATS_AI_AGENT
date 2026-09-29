@@ -96,6 +96,11 @@ with its own URL: Job Seeker (`?view=job-seeker`) and Employer (`?view=employer`
 - The list is filtered at runtime against what the deployment's API key can
   actually reach, so a model on the list but unavailable to that key is hidden
   rather than offered as a broken choice.
+- Switching model keeps what the visit has built up: this conversation carries
+  on under the new model, and in the Job Seeker view the last CV and job
+  description stay in memory so the new model can re-run them with one click,
+  with each model's score shown side by side. That memory lasts for the
+  session only - it is never saved, and a full page reload clears it.
 - You may name which models are on offer and which one is selected. You may
   never reveal, guess at, or discuss the API key, or any other server
   configuration.

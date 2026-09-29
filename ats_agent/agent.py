@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import errors, types
 
+from .memory import AgentMemory
 from .model_catalog import DEFAULT_MODEL_ID, resolve
 from .models import CVReview, ImprovementPlan, InterviewPrep, JobSuggestions, MatchResult
 from .prompts import (
@@ -44,11 +45,19 @@ class ATSAgentError(Exception):
 class ATSAgent:
     """Compares a candidate's CV against a job description and scores the match."""
 
-    def __init__(self, api_key: str | None = None, model: str | None = None):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        memory: AgentMemory | None = None,
+    ):
         self.client = genai.Client(api_key=api_key) if api_key else genai.Client()
         # A model arriving from the UI is visitor input, so it is resolved
         # against what this deployment offers rather than trusted as given.
         self.model = resolve(model, self.client)
+        # Memory belongs to the visitor, not to the model: pass the same object
+        # to the agent built after a model switch and it carries on from there.
+        self.memory = memory if memory is not None else AgentMemory()
 
     def cv_to_markdown(self, resume_text: str) -> str:
         """Clean/reformat raw extracted CV text into compact Markdown.
@@ -63,7 +72,14 @@ class ATSAgent:
         resume_text = resume_text.strip()[:MAX_DOCUMENT_CHARS]
         if not resume_text:
             raise ATSAgentError("The CV appears to be empty or unreadable.")
-        return self._generate_text(CV_TO_MARKDOWN_SYSTEM_PROMPT, resume_text)
+        # Cleaning is formatting, not judgement, so a version any model produced
+        # is good for every model - no call needed after a switch.
+        cached = self.memory.cached_markdown(resume_text)
+        if cached is not None:
+            return cached
+        markdown = self._generate_text(CV_TO_MARKDOWN_SYSTEM_PROMPT, resume_text)
+        self.memory.cache_markdown(resume_text, markdown)
+        return markdown
 
     def analyze(self, resume_text: str, job_description: str) -> MatchResult:
         resume_text, job_description = self._prepare_documents(resume_text, job_description)
@@ -75,7 +91,9 @@ class ATSAgent:
             f"{resume_text}\n\n"
             "Evaluate how well this CV matches this job description."
         )
-        return self._generate(SYSTEM_PROMPT, user_prompt, MatchResult)
+        result = self._generate(SYSTEM_PROMPT, user_prompt, MatchResult)
+        self.memory.record_score(self.model, result.match_percentage, result.verdict)
+        return result
 
     def suggest_improvement_plan(
         self, resume_text: str, job_description: str, current_result: MatchResult
@@ -170,11 +188,15 @@ class ATSAgent:
             user_prompt += "Suggest job titles/roles this candidate is well-qualified for right now."
         return self._generate(JOB_SUGGESTIONS_SYSTEM_PROMPT, user_prompt, JobSuggestions)
 
-    def answer_question(self, question: str, history: Sequence[Mapping[str, str]] = ()) -> str:
+    def answer_question(
+        self, question: str, history: Sequence[Mapping[str, str]] | None = None
+    ) -> str:
         """Answer a visitor's question about the product, grounded in the reference.
 
         `history` is the prior conversation as {"role": "user"|"assistant",
-        "content": str}, oldest first, excluding the question being asked.
+        "content": str}, oldest first, excluding the question being asked. Left
+        out, it is read from memory, and the exchange is written back there -
+        which is how a conversation survives a change of model.
         """
         # Imported here rather than at module scope: knowledge.py reads this
         # module's threshold constants, so a top-level import would be circular.
@@ -183,6 +205,10 @@ class ATSAgent:
         question = question.strip()
         if not question:
             raise ATSAgentError("Please enter a question.")
+
+        from_memory = history is None
+        if from_memory:
+            history = self.memory.history()
 
         contents = [
             {
@@ -197,6 +223,9 @@ class ATSAgent:
         text = (response.text or "").strip()
         if not text:
             raise ATSAgentError("The assistant didn't return an answer. Please try again.")
+        if from_memory:
+            self.memory.add_turn("user", question)
+            self.memory.add_turn("assistant", text, model=self.model)
         return text
 
     def _prepare_documents(self, resume_text: str, job_description: str) -> tuple[str, str]:
