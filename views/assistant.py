@@ -5,34 +5,30 @@ import streamlit as st
 
 from ats_agent import ATSAgent, ATSAgentError
 from ats_agent.knowledge import STARTER_QUESTIONS
+from views.memory import session_memory
 from views.model_picker import selected_model
 from views.common import require_api_key
 from views.theme import view_header
 
-HISTORY_KEY = "assistant_history"
-
-
-def _history() -> list[dict[str, str]]:
-    return st.session_state.setdefault(HISTORY_KEY, [])
-
 
 def _answer(question: str) -> None:
-    """Append the question, then the assistant's reply, to the conversation."""
-    history = _history()
+    """Append the question, then the assistant's reply, to the conversation.
+
+    The conversation lives in the session's agent memory rather than with the
+    model, so switching model mid-chat continues the same thread.
+    """
     api_key = require_api_key()
     if not api_key:
         return
 
-    prior = list(history)
-    history.append({"role": "user", "content": question})
+    memory = session_memory()
     try:
-        answer = ATSAgent(api_key=api_key, model=selected_model()).answer_question(question, prior)
+        ATSAgent(api_key=api_key, model=selected_model(), memory=memory).answer_question(question)
     except ATSAgentError as e:
         # Keep the failure in the transcript so the person can see what happened
         # against their question, rather than a banner that vanishes on rerun.
-        history.append({"role": "assistant", "content": f"Sorry - {e}"})
-        return
-    history.append({"role": "assistant", "content": answer})
+        memory.add_turn("user", question)
+        memory.add_turn("assistant", f"Sorry - {e}")
 
 
 def render() -> None:
@@ -43,7 +39,8 @@ def render() -> None:
         "and will say so when it doesn't know.",
     )
 
-    history = _history()
+    memory = session_memory()
+    history = memory.turns
 
     if not history:
         st.caption("Try one of these:")
@@ -54,9 +51,11 @@ def render() -> None:
                     _answer(question)
                     st.rerun()
 
-    for message in history:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    for turn in history:
+        with st.chat_message(turn.role):
+            st.markdown(turn.content)
+            if turn.model:
+                st.caption(f"Answered by {turn.model}")
 
     if question := st.chat_input("Ask a question about the app..."):
         _answer(question)
@@ -64,9 +63,9 @@ def render() -> None:
 
     if history:
         if st.button("Clear conversation", key="assistant_clear"):
-            st.session_state[HISTORY_KEY] = []
+            memory.clear_conversation()
             st.rerun()
         st.caption(
             "The assistant can't see your CV or your results - those stay in the view "
-            "that produced them."
+            "that produced them. Switching model keeps this conversation."
         )

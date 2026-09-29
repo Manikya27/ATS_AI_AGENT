@@ -5,6 +5,7 @@ import streamlit as st
 
 from ats_agent import ATSAgent, ATSAgentError, STRONG_MATCH_THRESHOLD
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
+from views.memory import session_memory
 from views.model_picker import selected_model
 from views.common import (
     record_usage,
@@ -73,74 +74,9 @@ def render() -> None:
             st.error("Please provide a job description (upload a file or paste text).")
             st.stop()
 
-        agent = ATSAgent(api_key=api_key, model=selected_model())
+        _run_analysis(api_key, resume_text, job_description)
 
-        with st.spinner("Reading your CV..."):
-            try:
-                resume_md = agent.cv_to_markdown(resume_text)
-            except ATSAgentError as e:
-                st.error(str(e))
-                st.stop()
-
-        with st.spinner("Analyzing match..."):
-            try:
-                result = agent.analyze(resume_md, job_description)
-            except ATSAgentError as e:
-                st.error(str(e))
-                st.stop()
-
-        st.session_state["js_last_result"] = result
-        st.session_state["js_last_cv_review"] = None
-        st.session_state["js_last_improvement_plan"] = None
-        st.session_state["js_last_interview_prep"] = None
-        st.session_state["js_last_job_suggestions"] = None
-        # Recording the run reruns the script, which throws away anything already
-        # drawn - so a step that fails has to leave its message in state rather
-        # than calling st.warning here, or the section just vanishes silently.
-        warnings: list[str] = []
-        st.session_state["js_last_warnings"] = warnings
-
-        # Runs at every score: the keyword screen is what decides whether a CV is
-        # read at all, so a strong match needs it as much as a weak one.
-        with st.spinner("Checking the CV against the role's own wording..."):
-            try:
-                st.session_state["js_last_cv_review"] = agent.review_cv(
-                    resume_md, job_description
-                )
-            except ATSAgentError as e:
-                warnings.append(f"Couldn't run the keyword and formatting check: {e}")
-
-        # The two sides of the bar need opposite things. Short of it, the useful
-        # help is closing the gap; at or above it the CV has done its job and
-        # the interview is what is left.
-        if result.match_percentage < STRONG_MATCH_THRESHOLD:
-            with st.spinner("Working out how to close the gap..."):
-                try:
-                    st.session_state["js_last_improvement_plan"] = agent.suggest_improvement_plan(
-                        resume_md, job_description, result
-                    )
-                except ATSAgentError as e:
-                    warnings.append(f"Couldn't generate an improvement plan: {e}")
-        else:
-            with st.spinner("Working out what they're likely to ask you..."):
-                try:
-                    st.session_state["js_last_interview_prep"] = agent.prepare_interview(
-                        resume_md, job_description, result
-                    )
-                except ATSAgentError as e:
-                    warnings.append(f"Couldn't prepare interview questions: {e}")
-
-        # Similar roles are useful at any score - a strong match still wants other
-        # openings of the same kind to apply to.
-        with st.spinner("Finding similar roles your CV already fits..."):
-            try:
-                st.session_state["js_last_job_suggestions"] = agent.suggest_jobs(
-                    resume_md, job_description
-                )
-            except ATSAgentError as e:
-                warnings.append(f"Couldn't suggest similar roles: {e}")
-
-        record_usage(cvs=1)
+    _render_model_switch()
 
     if "js_last_result" in st.session_state:
         st.divider()
@@ -168,3 +104,106 @@ def render() -> None:
         if job_suggestions is not None:
             st.divider()
             render_job_suggestions(job_suggestions)
+
+
+def _run_analysis(api_key: str, resume_text: str, job_description: str) -> None:
+    """Run every step for one CV and job description, leaving the results in state.
+
+    The pair is kept in the session's agent memory first, so a visitor who then
+    switches model can re-run it with the new one without uploading again.
+    """
+    memory = session_memory()
+    memory.remember_documents(resume_text, job_description)
+    agent = ATSAgent(api_key=api_key, model=selected_model(), memory=memory)
+
+    with st.spinner("Reading your CV..."):
+        try:
+            resume_md = agent.cv_to_markdown(resume_text)
+        except ATSAgentError as e:
+            st.error(str(e))
+            st.stop()
+
+    with st.spinner("Analyzing match..."):
+        try:
+            result = agent.analyze(resume_md, job_description)
+        except ATSAgentError as e:
+            st.error(str(e))
+            st.stop()
+
+    st.session_state["js_last_result"] = result
+    st.session_state["js_last_cv_review"] = None
+    st.session_state["js_last_improvement_plan"] = None
+    st.session_state["js_last_interview_prep"] = None
+    st.session_state["js_last_job_suggestions"] = None
+    # Recording the run reruns the script, which throws away anything already
+    # drawn - so a step that fails has to leave its message in state rather
+    # than calling st.warning here, or the section just vanishes silently.
+    warnings: list[str] = []
+    st.session_state["js_last_warnings"] = warnings
+
+    # Runs at every score: the keyword screen is what decides whether a CV is
+    # read at all, so a strong match needs it as much as a weak one.
+    with st.spinner("Checking the CV against the role's own wording..."):
+        try:
+            st.session_state["js_last_cv_review"] = agent.review_cv(
+                resume_md, job_description
+            )
+        except ATSAgentError as e:
+            warnings.append(f"Couldn't run the keyword and formatting check: {e}")
+
+    # The two sides of the bar need opposite things. Short of it, the useful
+    # help is closing the gap; at or above it the CV has done its job and
+    # the interview is what is left.
+    if result.match_percentage < STRONG_MATCH_THRESHOLD:
+        with st.spinner("Working out how to close the gap..."):
+            try:
+                st.session_state["js_last_improvement_plan"] = agent.suggest_improvement_plan(
+                    resume_md, job_description, result
+                )
+            except ATSAgentError as e:
+                warnings.append(f"Couldn't generate an improvement plan: {e}")
+    else:
+        with st.spinner("Working out what they're likely to ask you..."):
+            try:
+                st.session_state["js_last_interview_prep"] = agent.prepare_interview(
+                    resume_md, job_description, result
+                )
+            except ATSAgentError as e:
+                warnings.append(f"Couldn't prepare interview questions: {e}")
+
+    # Similar roles are useful at any score - a strong match still wants other
+    # openings of the same kind to apply to.
+    with st.spinner("Finding similar roles your CV already fits..."):
+        try:
+            st.session_state["js_last_job_suggestions"] = agent.suggest_jobs(
+                resume_md, job_description
+            )
+        except ATSAgentError as e:
+            warnings.append(f"Couldn't suggest similar roles: {e}")
+
+    record_usage(cvs=1)
+
+
+def _render_model_switch() -> None:
+    """After a model change, offer the remembered analysis to the new model."""
+    memory = session_memory()
+    if not memory.has_documents() or "js_last_result" not in st.session_state:
+        return
+
+    current = selected_model()
+    if memory.last_scored_model() not in (None, current):
+        st.info(
+            f"You switched to **{current}**. It has the CV and job description from your "
+            "last analysis in memory, so you can re-run it without uploading again."
+        )
+        if st.button(f"Re-run with {current}", key="js_rerun_model", type="primary"):
+            api_key = require_api_key()
+            if not api_key:
+                st.stop()
+            _run_analysis(api_key, memory.resume_text, memory.job_description)
+
+    if len(memory.scores) > 1:
+        st.caption(
+            "Scores for this CV and role: "
+            + " · ".join(f"{s.model}: {s.match_percentage}%" for s in memory.scores)
+        )
