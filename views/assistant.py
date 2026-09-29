@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ats_agent import ATSAgent, ATSAgentError
+from ats_agent import ATSAgent
 from ats_agent.knowledge import STARTER_QUESTIONS
 from views.memory import session_memory
 from views.model_picker import selected_model
@@ -21,14 +21,9 @@ def _answer(question: str) -> None:
     if not api_key:
         return
 
-    memory = session_memory()
-    try:
-        ATSAgent(api_key=api_key, model=selected_model(), memory=memory).answer_question(question)
-    except ATSAgentError as e:
-        # Keep the failure in the transcript so the person can see what happened
-        # against their question, rather than a banner that vanishes on rerun.
-        memory.add_turn("user", question)
-        memory.add_turn("assistant", f"Sorry - {e}")
+    # A failed answer is written into the transcript by the graph itself, so
+    # the person sees it against their question.
+    session_memory().ask(ATSAgent(api_key=api_key, model=selected_model()), question)
 
 
 def render() -> None:
@@ -52,10 +47,10 @@ def render() -> None:
                     st.rerun()
 
     for turn in history:
-        with st.chat_message(turn.role):
-            st.markdown(turn.content)
-            if turn.model:
-                st.caption(f"Answered by {turn.model}")
+        with st.chat_message(turn["role"]):
+            st.markdown(turn["content"])
+            if turn["model"]:
+                st.caption(f"Answered by {turn['model']}")
 
     if question := st.chat_input("Ask a question about the app..."):
         _answer(question)

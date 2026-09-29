@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ats_agent import ATSAgent, ATSAgentError, STRONG_MATCH_THRESHOLD
+from ats_agent import ATSAgent
 from ats_agent.parsers import SUPPORTED_EXTENSIONS, UnsupportedFileType, extract_text
 from views.memory import session_memory
 from views.model_picker import selected_model
@@ -77,117 +77,50 @@ def render() -> None:
         _run_analysis(api_key, resume_text, job_description)
 
     _render_model_switch()
-
-    if "js_last_result" in st.session_state:
-        st.divider()
-        for message in st.session_state.get("js_last_warnings") or []:
-            st.warning(message)
-
-        render_result(st.session_state["js_last_result"])
-
-        cv_review = st.session_state.get("js_last_cv_review")
-        if cv_review is not None:
-            st.divider()
-            render_cv_review(cv_review)
-
-        improvement_plan = st.session_state.get("js_last_improvement_plan")
-        if improvement_plan is not None:
-            st.divider()
-            render_improvement_plan(improvement_plan)
-
-        interview_prep = st.session_state.get("js_last_interview_prep")
-        if interview_prep is not None:
-            st.divider()
-            render_interview_prep(interview_prep)
-
-        job_suggestions = st.session_state.get("js_last_job_suggestions")
-        if job_suggestions is not None:
-            st.divider()
-            render_job_suggestions(job_suggestions)
+    _render_last_analysis()
 
 
-def _run_analysis(api_key: str, resume_text: str, job_description: str) -> None:
-    """Run every step for one CV and job description, leaving the results in state.
+# What the visitor is told while each step of the analysis graph runs, keyed by
+# the step that has just finished.
+_STEP_LABELS = {
+    "prepare": "Analyzing match...",
+    "analyze": "Checking the CV against the role's own wording...",
+    "review_cv": "Tailoring the next steps to your score...",
+    "improvement_plan": "Finding similar roles your CV already fits...",
+    "interview_prep": "Finding similar roles your CV already fits...",
+}
 
-    The pair is kept in the session's agent memory first, so a visitor who then
-    switches model can re-run it with the new one without uploading again.
+
+def _run_analysis(
+    api_key: str, resume_text: str | None = None, job_description: str | None = None
+) -> None:
+    """Run the analysis graph on the session's memory with the selected model.
+
+    Given documents it analyses them and remembers them. Without, it re-runs
+    the pair already in memory - which is how a newly chosen model takes over.
     """
     memory = session_memory()
-    memory.remember_documents(resume_text, job_description)
-    agent = ATSAgent(api_key=api_key, model=selected_model(), memory=memory)
+    agent = ATSAgent(api_key=api_key, model=selected_model())
 
-    with st.spinner("Reading your CV..."):
-        try:
-            resume_md = agent.cv_to_markdown(resume_text)
-        except ATSAgentError as e:
-            st.error(str(e))
-            st.stop()
+    with st.status("Reading your CV...") as status:
+        for step in memory.analyze(agent, resume_text, job_description):
+            if step in _STEP_LABELS:
+                status.update(label=_STEP_LABELS[step])
 
-    with st.spinner("Analyzing match..."):
-        try:
-            result = agent.analyze(resume_md, job_description)
-        except ATSAgentError as e:
-            st.error(str(e))
-            st.stop()
+    error = memory.values.get("error")
+    if error:
+        st.error(error)
+        st.stop()
 
-    st.session_state["js_last_result"] = result
-    st.session_state["js_last_cv_review"] = None
-    st.session_state["js_last_improvement_plan"] = None
-    st.session_state["js_last_interview_prep"] = None
-    st.session_state["js_last_job_suggestions"] = None
-    # Recording the run reruns the script, which throws away anything already
-    # drawn - so a step that fails has to leave its message in state rather
-    # than calling st.warning here, or the section just vanishes silently.
-    warnings: list[str] = []
-    st.session_state["js_last_warnings"] = warnings
-
-    # Runs at every score: the keyword screen is what decides whether a CV is
-    # read at all, so a strong match needs it as much as a weak one.
-    with st.spinner("Checking the CV against the role's own wording..."):
-        try:
-            st.session_state["js_last_cv_review"] = agent.review_cv(
-                resume_md, job_description
-            )
-        except ATSAgentError as e:
-            warnings.append(f"Couldn't run the keyword and formatting check: {e}")
-
-    # The two sides of the bar need opposite things. Short of it, the useful
-    # help is closing the gap; at or above it the CV has done its job and
-    # the interview is what is left.
-    if result.match_percentage < STRONG_MATCH_THRESHOLD:
-        with st.spinner("Working out how to close the gap..."):
-            try:
-                st.session_state["js_last_improvement_plan"] = agent.suggest_improvement_plan(
-                    resume_md, job_description, result
-                )
-            except ATSAgentError as e:
-                warnings.append(f"Couldn't generate an improvement plan: {e}")
-    else:
-        with st.spinner("Working out what they're likely to ask you..."):
-            try:
-                st.session_state["js_last_interview_prep"] = agent.prepare_interview(
-                    resume_md, job_description, result
-                )
-            except ATSAgentError as e:
-                warnings.append(f"Couldn't prepare interview questions: {e}")
-
-    # Similar roles are useful at any score - a strong match still wants other
-    # openings of the same kind to apply to.
-    with st.spinner("Finding similar roles your CV already fits..."):
-        try:
-            st.session_state["js_last_job_suggestions"] = agent.suggest_jobs(
-                resume_md, job_description
-            )
-        except ATSAgentError as e:
-            warnings.append(f"Couldn't suggest similar roles: {e}")
-
+    # Recording the run reruns the script, which is why a step that fails is
+    # kept as a warning in memory rather than shown with st.warning here.
     record_usage(cvs=1)
 
 
 def _render_model_switch() -> None:
     """After a model change, offer the remembered analysis to the new model."""
     memory = session_memory()
-    if not memory.has_documents() or "js_last_result" not in st.session_state:
+    if not memory.has_documents() or memory.values.get("result") is None:
         return
 
     current = selected_model()
@@ -200,10 +133,34 @@ def _render_model_switch() -> None:
             api_key = require_api_key()
             if not api_key:
                 st.stop()
-            _run_analysis(api_key, memory.resume_text, memory.job_description)
+            _run_analysis(api_key)
 
-    if len(memory.scores) > 1:
+    scores = memory.scores
+    if len(scores) > 1:
         st.caption(
             "Scores for this CV and role: "
-            + " · ".join(f"{s.model}: {s.match_percentage}%" for s in memory.scores)
+            + " · ".join(f"{s['model']}: {s['match_percentage']}%" for s in scores)
         )
+
+
+def _render_last_analysis() -> None:
+    state = session_memory().values
+    result = state.get("result")
+    if result is None:
+        return
+
+    st.divider()
+    for message in state.get("warnings") or []:
+        st.warning(message)
+
+    render_result(result)
+
+    for key, render_section in (
+        ("cv_review", render_cv_review),
+        ("improvement_plan", render_improvement_plan),
+        ("interview_prep", render_interview_prep),
+        ("job_suggestions", render_job_suggestions),
+    ):
+        if state.get(key) is not None:
+            st.divider()
+            render_section(state[key])

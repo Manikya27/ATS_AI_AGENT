@@ -66,14 +66,18 @@ your system prefers reduced motion. The same walkthrough is in
   reach, so an allowlisted-but-unavailable model is hidden rather than offered as a broken
   choice. The selection travels as `?model=` and is re-validated against the allowlist on
   every request, because a query parameter is visitor input
-- **Model-independent memory**: what the agent has learned in a visit lives in an
-  `AgentMemory` ([`ats_agent/memory.py`](./ats_agent/memory.py)) rather than with any one
-  model, so switching model keeps it. The assistant conversation continues under the new
-  model (each reply is tagged with the model that wrote it); the Job Seeker view offers a
-  one-click "Re-run with <model>" on the CV and job description already in memory, and
-  lists each model's score side by side; and a CV's cleaned Markdown is reused rather than
-  re-converted. Memory is held in the session only - never written to disk - and ends on
-  a full page load
+- **Model-independent memory, on LangGraph**: what the agent has learned in a visit lives
+  in a [LangGraph](https://langchain-ai.github.io/langgraph/) thread
+  ([`ats_agent/memory.py`](./ats_agent/memory.py)) rather than with any one model. The
+  graph's state is checkpointed per thread, and the model is handed to each run as runtime
+  context, which LangGraph never checkpoints - so switching model keeps everything. The
+  assistant conversation continues under the new model (each reply tagged with the model
+  that wrote it); the Job Seeker view offers a one-click "Re-run with <model>" on the CV and
+  job description already in memory and lists each model's score side by side; and a CV's
+  cleaned Markdown is reused rather than re-converted. The analysis itself runs as graph
+  nodes, with the 75% bar as a conditional edge between the improvement plan and interview
+  prep. The default checkpointer is in memory and ends with the session; `AgentMemory`
+  accepts any LangGraph checkpointer if memory should outlive it
 - URL-routed views with a persistent nav bar; back/forward and shareable links both work
 - In-app assistant: a conversational view for questions about the product, answering only
   from a curated reference whose numbers are interpolated from the app's own constants, so
@@ -151,7 +155,7 @@ views/
   landing.py               Landing page: overview, persona chooser, demo, FAQ
   persona.py                Which side the visitor is here as, and what they see
   model_picker.py            The model chooser and the validated current selection
-  memory.py                  The visitor's AgentMemory, kept in session state
+  memory.py                  The visitor's AgentMemory (a LangGraph thread), kept in session state
   assistant.py              Assistant view - grounded chat about the product
   router.py                  Query-param routing (one URL per view)
   theme.py                   Brand chrome: stylesheet, nav bar, stat tiles
@@ -169,7 +173,7 @@ ats_agent/
   scheduling.py                 CV email extraction + Google Calendar meeting link builder
   talent_pool.py                 Opt-in storage of screened CVs + the lexical pre-ranker
   model_catalog.py                Which models are offered, and runtime availability checks
-  memory.py                      AgentMemory - conversation, documents and scores shared across models
+  memory.py                      LangGraph memory graph + AgentMemory, shared across models
   stats.py                       Persistent usage counters behind the header stats
 Dockerfile                 Container image for hosting the app as a service
 ```
